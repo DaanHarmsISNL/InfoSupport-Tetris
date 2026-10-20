@@ -16,6 +16,7 @@ builder.Services.AddSingleton<IGameSessionStore, GameSessionStore>();
 // (arc42 §09, open question 1); nothing above this interface changes when that is resolved.
 builder.Services.AddSingleton<IScoreSubmissionService, ScoreSubmissionService>();
 builder.Services.AddSingleton<ILeaderboardStore, LeaderboardStore>();
+builder.Services.AddSingleton<ILeaderboardQueryService, LeaderboardQueryService>();
 
 var app = builder.Build();
 

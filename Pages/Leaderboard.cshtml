@@ -1,0 +1,160 @@
+@page "/Leaderboard"
+@model LeaderboardModel
+@{
+    ViewData["Title"] = "Leaderboard";
+    var view = Model.View;
+}
+
+<div class="leaderboard-page">
+    <h1 class="display-4">Leaderboard</h1>
+
+    @* docs/specs/010-view-leaderboard.md FR-016/DR-193: reachable with no precondition, and
+       offers a way to start a game and a way back without ever requiring a finished run. *@
+    <p class="leaderboard-actions">
+        <a class="btn btn-primary" asp-page="/Index">Play a game</a>
+        <a class="btn btn-secondary" asp-page="/Index">Back</a>
+    </p>
+
+    @if (view.EntryCount == 0)
+    {
+        @* FR-018/DR-187: an explicit, inviting empty state -- never a table header with no rows. *@
+        <div class="leaderboard-empty" role="status">
+            <p><strong>No scores yet.</strong></p>
+            <p>Nobody has played a game that counted yet. Be the first on the board.</p>
+            <a class="btn btn-primary" asp-page="/Index">Play the first game</a>
+        </div>
+    }
+    else
+    {
+        <p class="leaderboard-summary" role="status">
+            Showing ranks @view.WindowStart&ndash;@(view.WindowStart + view.Rows.Count - 1) of @view.EntryCount @(view.EntryCount == 1 ? "entry" : "entries").
+        </p>
+
+        @* FR-026/DR-197: a real table, named for what it is, with header cells associated with
+           their data cells, so a screen reader announces e.g. "Rank 4, Daan, 12,400, 31, 4". *@
+        <table class="leaderboard-table" aria-label="All-time leaderboard">
+            <caption class="visually-hidden">All-time leaderboard, ranked by score</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Rank</th>
+                    <th scope="col">Player</th>
+                    <th scope="col">Score</th>
+                    <th scope="col">Lines</th>
+                    <th scope="col">Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in view.Rows)
+                {
+                    <tr>
+                        @* FR-027/DR-197: rank is text in its own cell, never implied by row position alone. *@
+                        <th scope="row">@row.Rank</th>
+                        <td class="leaderboard-name-cell">
+                            @* DR-181..DR-184: fixed-width cell, visibly truncated, full name on
+                               demand and to assistive technology, own directional context so an
+                               RTL name cannot reorder the figures around it. *@
+                            <span class="leaderboard-name" dir="auto" title="@row.PlayerName">@row.PlayerName</span>
+                        </td>
+                        <td class="leaderboard-figure">@row.Score.ToString("N0")</td>
+                        <td class="leaderboard-figure">@row.LinesCleared</td>
+                        <td class="leaderboard-figure">@row.Level</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @* FR-009/FR-010/FR-011: show-more grows the window (appending beneath what is already
+           shown) without replacing it, and is withdrawn once the whole board is on screen. *@
+        @if (Model.NextWindowSize is { } nextSize)
+        {
+            <p>
+                <a class="btn btn-secondary" asp-page="/Leaderboard" asp-route-windowSize="@nextSize">Show more</a>
+            </p>
+        }
+        else
+        {
+            <p role="status">This is the whole board.</p>
+        }
+    }
+
+    @* FR-024: an explicit refresh -- the board is fetched fresh on every request (DR-191); a
+       full page reload is exactly that fresh read, so no separate AJAX refresh path is needed. *@
+    <p>
+        <a class="btn btn-link" asp-page="/Leaderboard" asp-route-windowSize="@view.WindowSize">Refresh</a>
+    </p>
+</div>
+
+<style>
+    .leaderboard-page {
+        max-width: 720px;
+        margin: 0 auto;
+        text-align: left;
+        color: var(--text-primary);
+    }
+
+    .leaderboard-actions {
+        display: flex;
+        gap: var(--space-3);
+    }
+
+    .leaderboard-empty {
+        padding: var(--space-6);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+    }
+
+    .leaderboard-summary {
+        color: var(--text-secondary);
+    }
+
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface-raised);
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: var(--space-2) var(--space-3);
+        border-bottom: 1px solid var(--border-subtle);
+        text-align: left;
+    }
+
+    /* DR-181: the figure columns sit at a fixed width identical in every row, independent of
+       any name's content or length. */
+    .leaderboard-figure {
+        font-family: var(--font-numeric);
+        text-align: right;
+        white-space: nowrap;
+        width: 1%;
+    }
+
+    /* DR-181/DR-182: the Player column has a bounded maximum width that cannot grow past it;
+       a name that does not fit is visibly truncated via text-overflow, never wrapped (which
+       would break row height) and never shrunk (which would make wide-script names worst-off). */
+    .leaderboard-name-cell {
+        max-width: 16rem;
+    }
+
+    .leaderboard-name {
+        display: inline-block;
+        max-width: 16rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: bottom;
+    }
+</style>

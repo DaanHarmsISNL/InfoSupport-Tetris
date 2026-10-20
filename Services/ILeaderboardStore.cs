@@ -1,3 +1,4 @@
+using System.Linq;
 using infosupport_tetris.Domain;
 
 namespace infosupport_tetris.Services;
@@ -23,6 +24,13 @@ public interface ILeaderboardStore
     /// that is exactly the case this method exists to resolve without a conflict error.
     /// </summary>
     LeaderboardEntry GetOrCreate(Guid runId, Func<LeaderboardEntry> createEntry);
+
+    /// <summary>
+    /// docs/specs/010-view-leaderboard.md DR-195: a read-only snapshot of every entry the board
+    /// holds. 010 orders and ranks the result itself (DR-169) -- this returns the entries
+    /// unordered and unfiltered, and creates, changes or deletes nothing.
+    /// </summary>
+    IReadOnlyCollection<LeaderboardEntry> GetAll();
 }
 
 public sealed class LeaderboardStore : ILeaderboardStore
@@ -31,4 +39,6 @@ public sealed class LeaderboardStore : ILeaderboardStore
 
     public LeaderboardEntry GetOrCreate(Guid runId, Func<LeaderboardEntry> createEntry) =>
         _entriesByRunId.GetOrAdd(runId, _ => createEntry());
+
+    public IReadOnlyCollection<LeaderboardEntry> GetAll() => _entriesByRunId.Values.ToArray();
 }

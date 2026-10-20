@@ -21,6 +21,10 @@
             <button type="submit" class="btn btn-primary btn-lg">Start game</button>
         </form>
 
+        @* docs/specs/010-view-leaderboard.md FR-014/DR-193: reachable from the landing area with
+           no precondition -- no finished run, no submitted score, no prior play. *@
+        <p><a asp-page="/Leaderboard">View leaderboard</a></p>
+
         @await Html.PartialAsync("_HoldDisplay", Model.Hold)
         @await Html.PartialAsync("_NextPiecePreview", preview)
     }
@@ -71,6 +75,11 @@
                 <button type="button" id="skip-score-button">Skip</button>
                 <p id="submission-status" role="status" aria-live="polite"></p>
             </div>
+
+            @* docs/specs/010-view-leaderboard.md FR-014/SC-019: reachable from the game-over state
+               with no precondition -- following it needs no submitted score (DR-192 is honoured by
+               the store itself, since the entry was already written before this link is followed). *@
+            <p><a asp-page="/Leaderboard">View leaderboard</a></p>
         }
 
         @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
