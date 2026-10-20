@@ -1,7 +1,7 @@
 ---
 name: story-mapping
 description: "Use this agent when the user wants to create a user story map, define project goals, discover user activities and stories, or build a project backlog. Also use when the user wants to refine their project scope or prioritize features.\n\nExamples:\n- user: \"I want to plan out my new project\"\n  assistant: \"Let me use the story-mapping agent to help you structure your project through a user story mapping exercise.\"\n\n- user: \"I need to figure out what to build\"\n  assistant: \"I'll launch the story-mapping agent to interview you about your project and map out user stories.\"\n\n- user: \"Let's define the scope for my product\"\n  assistant: \"I'll use the story-mapping agent to guide you through a structured discovery process.\""
-model: opus
+model: inherit
 color: yellow
 memory: project
 ---
