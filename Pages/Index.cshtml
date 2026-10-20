@@ -78,8 +78,11 @@
 
             @* docs/specs/010-view-leaderboard.md FR-014/SC-019: reachable from the game-over state
                with no precondition -- following it needs no submitted score (DR-192 is honoured by
-               the store itself, since the entry was already written before this link is followed). *@
-            <p><a asp-page="/Leaderboard">View leaderboard</a></p>
+               the store itself, since the entry was already written before this link is followed).
+               docs/specs/011-highlight-my-run.md DR-219: this is the one place the just-submitted
+               entryId hands itself to the board; the submission script below rewrites this link's
+               href to carry it once (and only once) a submission reaches Submitted. *@
+            <p><a id="view-leaderboard-link" asp-page="/Leaderboard">View leaderboard</a></p>
         }
 
         @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
@@ -217,6 +220,16 @@
                                     nameInput.disabled = true;
                                     submitButton.disabled = true;
                                     setStatus('Submitted! Your score is on the board.');
+
+                                    // docs/specs/011-highlight-my-run.md DR-199/DR-219: the one
+                                    // moment the entryId is handed to the board -- carried as a
+                                    // one-shot query parameter on the single link that leads there,
+                                    // never stored (DR-205, DR-218). The Leaderboard page strips it
+                                    // from the address immediately after reading it.
+                                    var leaderboardLink = document.getElementById('view-leaderboard-link');
+                                    if (leaderboardLink && result.entryId) {
+                                        leaderboardLink.href = '/Leaderboard?highlight=' + encodeURIComponent(result.entryId);
+                                    }
                                 } else {
                                     status = 'Failed';
                                     setStatus(result.failureMessage || 'The submission was refused.');

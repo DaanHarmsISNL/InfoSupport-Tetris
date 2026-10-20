@@ -1,8 +1,10 @@
 @page "/Leaderboard"
 @model LeaderboardModel
+@using infosupport_tetris.Domain
 @{
     ViewData["Title"] = "Leaderboard";
     var view = Model.View;
+    var highlight = Model.Highlight;
 }
 
 <div class="leaderboard-page">
@@ -30,6 +32,14 @@
             Showing ranks @view.WindowStart&ndash;@(view.WindowStart + view.Rows.Count - 1) of @view.EntryCount @(view.EntryCount == 1 ? "entry" : "entries").
         </p>
 
+        @* docs/specs/011-highlight-my-run.md FR-006/FR-020/DR-208/DR-216: plain-language placement,
+           text in the document (not a tooltip/toast), announced when it appears alongside the rest
+           of this live region. Absent entirely when there is no highlight (FR-015, DR-204). *@
+        @if (highlight is not null)
+        {
+            <p class="leaderboard-placement" role="status">@highlight.Placement.Statement</p>
+        }
+
         @* FR-026/DR-197: a real table, named for what it is, with header cells associated with
            their data cells, so a screen reader announces e.g. "Rank 4, Daan, 12,400, 31, 4". *@
         <table class="leaderboard-table" aria-label="All-time leaderboard">
@@ -46,7 +56,8 @@
             <tbody>
                 @foreach (var row in view.Rows)
                 {
-                    <tr>
+                    var isMine = highlight is not null && row.EntryId == highlight.EntryId;
+                    <tr class="@(isMine ? "leaderboard-row-mine" : null)">
                         @* FR-027/DR-197: rank is text in its own cell, never implied by row position alone. *@
                         <th scope="row">@row.Rank</th>
                         <td class="leaderboard-name-cell">
@@ -54,6 +65,12 @@
                                demand and to assistive technology, own directional context so an
                                RTL name cannot reorder the figures around it. *@
                             <span class="leaderboard-name" dir="auto" title="@row.PlayerName">@row.PlayerName</span>
+                            @* docs/specs/011-highlight-my-run.md FR-019/DR-215: a textual marker on
+                               the row itself, never colour alone. Story 013 owns the visual tokens. *@
+                            @if (isMine)
+                            {
+                                <span class="leaderboard-mine-badge">your run</span>
+                            }
                         </td>
                         <td class="leaderboard-figure">@row.Score.ToString("N0")</td>
                         <td class="leaderboard-figure">@row.LinesCleared</td>
@@ -63,12 +80,59 @@
             </tbody>
         </table>
 
+        @* docs/specs/011-highlight-my-run.md FR-009/DR-212/DR-213: the player's row shown in
+           context when it falls outside what is already on screen, appended below the main table
+           rather than folded into it so the table above remains byte-for-byte what 010 would have
+           rendered alone (DR-201, SUC-008). *@
+        @if (highlight?.Context is { } context)
+        {
+            @if (context.ShowsBreak)
+            {
+                @* FR-020/DR-216: the break is described in words, not a bare rule or ellipsis, so
+                   assistive technology does not skip it as decoration. *@
+                <p class="leaderboard-context-break" role="status">Your placement</p>
+            }
+            <table class="leaderboard-table leaderboard-context-table" aria-label="Your run in context">
+                <caption class="visually-hidden">Rows around your run</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Rank</th>
+                        <th scope="col">Player</th>
+                        <th scope="col">Score</th>
+                        <th scope="col">Lines</th>
+                        <th scope="col">Level</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in context.Rows)
+                    {
+                        var isMine = row.EntryId == highlight.EntryId;
+                        <tr class="@(isMine ? "leaderboard-row-mine" : null)">
+                            <th scope="row">@row.Rank</th>
+                            <td class="leaderboard-name-cell">
+                                <span class="leaderboard-name" dir="auto" title="@row.PlayerName">@row.PlayerName</span>
+                                @if (isMine)
+                                {
+                                    <span class="leaderboard-mine-badge">your run</span>
+                                }
+                            </td>
+                            <td class="leaderboard-figure">@row.Score.ToString("N0")</td>
+                            <td class="leaderboard-figure">@row.LinesCleared</td>
+                            <td class="leaderboard-figure">@row.Level</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
         @* FR-009/FR-010/FR-011: show-more grows the window (appending beneath what is already
-           shown) without replacing it, and is withdrawn once the whole board is on screen. *@
+           shown) without replacing it, and is withdrawn once the whole board is on screen.
+           docs/specs/011-highlight-my-run.md FR-013: the highlight entryId is carried forward so
+           expanding the board keeps the player's row marked (SC-003). *@
         @if (Model.NextWindowSize is { } nextSize)
         {
             <p>
-                <a class="btn btn-secondary" asp-page="/Leaderboard" asp-route-windowSize="@nextSize">Show more</a>
+                <a class="btn btn-secondary" asp-page="/Leaderboard" asp-route-windowSize="@nextSize" asp-route-highlight="@Model.HighlightEntryId">Show more</a>
             </p>
         }
         else
@@ -78,11 +142,30 @@
     }
 
     @* FR-024: an explicit refresh -- the board is fetched fresh on every request (DR-191); a
-       full page reload is exactly that fresh read, so no separate AJAX refresh path is needed. *@
+       full page reload is exactly that fresh read, so no separate AJAX refresh path is needed.
+       docs/specs/011-highlight-my-run.md SC-015: refreshing keeps the highlight live and simply
+       re-reads the board, so a changed rank is shown as the current standing, not an error. *@
     <p>
-        <a class="btn btn-link" asp-page="/Leaderboard" asp-route-windowSize="@view.WindowSize">Refresh</a>
+        <a class="btn btn-link" asp-page="/Leaderboard" asp-route-windowSize="@view.WindowSize" asp-route-highlight="@Model.HighlightEntryId">Refresh</a>
     </p>
 </div>
+
+@* docs/specs/011-highlight-my-run.md DR-205/DR-207/DR-219: the highlight's entryId travels here as
+   a query parameter -- the only value that survives a full Razor Pages navigation with no
+   client-side router in this project. It is removed from the visible address immediately, before
+   the player can act on it, so a browser reload (DR-207), a copied link (SC-020) or a bookmark
+   revisited later shows a clean "/Leaderboard" with no entryId in it. This script never re-adds an
+   entryId; "Show more"/"Refresh" above re-request the server to keep the highlight live instead. *@
+@if (Model.HighlightEntryId is not null)
+{
+    <script>
+        (function () {
+            var url = new URL(window.location.href);
+            url.searchParams.delete('highlight');
+            window.history.replaceState(null, '', url.toString());
+        })();
+    </script>
+}
 
 <style>
     .leaderboard-page {
@@ -106,6 +189,39 @@
 
     .leaderboard-summary {
         color: var(--text-secondary);
+    }
+
+    /* docs/specs/011-highlight-my-run.md DR-215: the textual badge below carries the meaning on
+       its own; this background is an additional visual cue, never the only one. */
+    .leaderboard-row-mine {
+        background: color-mix(in srgb, var(--brand-accent) 18%, var(--surface-raised));
+    }
+
+    .leaderboard-mine-badge {
+        margin-left: var(--space-2);
+        padding: 0 var(--space-2);
+        border-radius: var(--radius-sm, 4px);
+        background: var(--brand-primary);
+        color: var(--is-white, #fff);
+        font-size: 0.75em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+    }
+
+    .leaderboard-placement {
+        font-weight: 600;
+    }
+
+    .leaderboard-context-break {
+        margin-top: var(--space-4);
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+
+    .leaderboard-context-table {
+        margin-top: var(--space-2);
     }
 
     .visually-hidden {

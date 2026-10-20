@@ -35,12 +35,40 @@ public class LeaderboardModel : PageModel
     /// <summary>DR-174: the window size show-more would grow to next, or null once the whole board is shown.</summary>
     public int? NextWindowSize { get; private set; }
 
-    public void OnGet(int? windowSize)
+    /// <summary>
+    /// docs/specs/011-highlight-my-run.md: the just-finished run to mark, resolved against
+    /// <see cref="View"/>, or null when there is none to show (DR-203, DR-204). Never stored --
+    /// recomputed from the query string on every request (see <see cref="HighlightEntryId"/>).
+    /// </summary>
+    public RunHighlight? Highlight { get; private set; }
+
+    /// <summary>
+    /// docs/specs/011-highlight-my-run.md DR-219/DR-205: the one-shot handover of the just-submitted
+    /// entryId across the full-page navigation from game-over to this page. There is no client-side
+    /// router in this project (CLAUDE.md), so a query parameter is the only way a value crosses a
+    /// Razor Pages navigation at all; the page strips it from the visible address immediately after
+    /// load (see Leaderboard.cshtml's inline script) so a reload or a bookmark/copy of the address
+    /// bar made after that point carries no entryId (DR-207, FR-017). A link copied in the instant
+    /// before the strip runs would still carry it, same as any other copy of this page's address --
+    /// but entryId is not a secret and the board is already public (010 DR-191), so the worst case is
+    /// a stranger's row getting an anonymous visual mark, never a disclosure (DR-204, EC-9).
+    /// Carried forward by Show more/Refresh (<see cref="View"/>'s own affordances) so the highlight
+    /// survives expanding and re-reading within the same visit (FR-010, FR-013, SC-003, SC-015).
+    /// </summary>
+    public Guid? HighlightEntryId { get; private set; }
+
+    public void OnGet(int? windowSize, Guid? highlight)
     {
         var size = NormalizeWindowSize(windowSize);
-        View = _queryService.GetView(WindowRequest.Top(size), DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        View = _queryService.GetView(WindowRequest.Top(size), now);
 
         NextWindowSize = View.HasMore ? NextStep(size) : null;
+
+        HighlightEntryId = highlight;
+        Highlight = highlight is { } entryId
+            ? RunHighlightResolver.Resolve(_queryService, View, entryId, now)
+            : null;
     }
 
     private static int NormalizeWindowSize(int? requested)
