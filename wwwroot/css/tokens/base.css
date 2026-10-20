@@ -1,0 +1,64 @@
+/*
+ * Base resets driven by tokens
+ * ------------------------------------------------
+ * Spec: docs/specs/013-brand-styling.md — Constant Root Font Size (DR-143),
+ * No Literal Values (DR-142), Focus Visibility (DR-150), Tabular Figures
+ * (DR-160), Minimum Viewport (DR-166).
+ *
+ * This file replaces the scaffold rules it supersedes rather than
+ * overriding them: the 14px/768px responsive root font-size rule and the
+ * hard-coded #258cfb focus glow, both previously in wwwroot/css/site.css,
+ * are removed there (SC-003) — their replacements live here, token-driven.
+ */
+
+html {
+  /* Constant Root Font Size (DR-143): 16px at every viewport width, so
+     every rem-based token has exactly one pixel meaning. */
+  font-size: 16px;
+}
+
+body {
+  background-color: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
+}
+
+/* Focus Visibility (DR-150): every interactive element shows a visible
+   :focus-visible indicator at >= 3:1 against both itself and the surface
+   behind it. Replaces the scaffold's hard-coded box-shadow glow. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Tabular Figures (DR-160): apply to every numeric readout — live score,
+   level, lines, final score, leaderboard scores and ranks — so a digit
+   change never alters the rendered width of a number. */
+.numeric,
+[data-token-role="numeric"] {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Type role utility classes (DR-158, DR-159). Optional convenience hooks —
+   consumers may also apply the custom properties directly. */
+.text-display { font-size: var(--font-size-display); font-weight: var(--font-weight-bold); line-height: 1.05; letter-spacing: -0.02em; font-family: var(--font-display); }
+.text-h1 { font-size: var(--font-size-h1); font-weight: var(--font-weight-bold); line-height: 1.15; letter-spacing: -0.01em; }
+.text-h2 { font-size: var(--font-size-h2); font-weight: var(--font-weight-semibold); line-height: 1.2; }
+.text-h3 { font-size: var(--font-size-h3); font-weight: var(--font-weight-semibold); line-height: 1.25; }
+.text-body-lg { font-size: var(--font-size-body-lg); font-weight: var(--font-weight-regular); line-height: 1.5; }
+.text-body { font-size: var(--font-size-body); font-weight: var(--font-weight-regular); line-height: 1.5; }
+.text-label { font-size: var(--font-size-label); font-weight: var(--font-weight-semibold); line-height: 1.4; letter-spacing: 0.04em; }
+.text-numeric { font-size: var(--font-size-numeric); font-weight: var(--font-weight-semibold); line-height: 1; font-family: var(--font-numeric); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.text-numeric-lg { font-size: var(--font-size-numeric-lg); font-weight: var(--font-weight-semibold); line-height: 1; font-family: var(--font-numeric); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* Minimum Viewport (DR-166): below 1024x640 CSS pixels the layout degrades
+   to scrolling rather than clipping or overlapping; it is not designed
+   around smaller viewports. */
+body {
+  min-width: var(--viewport-min-width);
+}

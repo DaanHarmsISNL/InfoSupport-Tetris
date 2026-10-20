@@ -1,0 +1,68 @@
+/*
+ * Bootstrap bridge — Bootstrap Bridging (DR-167)
+ * ------------------------------------------------
+ * Spec: docs/specs/013-brand-styling.md §5.7 DR-167.
+ *
+ * The vendored Bootstrap under wwwroot/lib/ is re-skinned, not replaced: we
+ * map its own `--bs-*` custom properties onto this spec's semantic tokens
+ * here, in a stylesheet that is NOT under wwwroot/lib/. No vendored file is
+ * ever edited — if Bootstrap is upgraded and its variable names change,
+ * only this file needs updating (EC-11).
+ *
+ * No Bootstrap component is used inside the playfield (DR-167); this bridge
+ * only concerns chrome: navbar, buttons, forms, body chrome.
+ */
+
+:root {
+  color-scheme: dark; /* Single Dark Theme (DR-145) — native controls, scrollbars and
+                          form widgets match the dark surface. */
+
+  --bs-body-color: var(--text-primary);
+  --bs-body-bg: var(--surface);
+  --bs-body-font-family: var(--font-body);
+  --bs-body-font-size: var(--font-size-body);
+
+  --bs-border-color: var(--border-subtle);
+  --bs-border-radius: var(--radius-md);
+  --bs-border-width: var(--border-width-hairline);
+
+  --bs-link-color: var(--brand-primary);
+  --bs-link-hover-color: var(--brand-primary-hover);
+
+  --bs-primary: var(--brand-primary);
+  --bs-primary-rgb: 46, 95, 217;
+  --bs-secondary: var(--text-secondary);
+  --bs-success: var(--status-success);
+  --bs-danger: var(--status-danger);
+  --bs-warning: var(--status-warning);
+
+  --bs-emphasis-color: var(--text-primary);
+  --bs-secondary-color: var(--text-secondary);
+  --bs-secondary-bg: var(--surface-raised);
+  --bs-tertiary-bg: var(--surface-raised);
+
+  --bs-focus-ring-color: var(--focus-ring);
+}
+
+/* Scaffold chrome (navbar, footer) currently carries Bootstrap's light
+   utility classes (bg-white, navbar-light, text-dark, text-muted) directly
+   in markup. Re-skinning that markup to track the dark theme belongs to the
+   owning page/layout work, not to this token-only spec (§1.3 Non-Goals) —
+   but buttons, form controls and links driven purely by the --bs-* custom
+   properties above already pick up the dark theme with no markup change. */
+
+.btn-primary {
+  --bs-btn-color: var(--text-on-brand);
+  --bs-btn-bg: var(--brand-primary);
+  --bs-btn-border-color: var(--brand-primary);
+  --bs-btn-hover-bg: var(--brand-primary-hover);
+  --bs-btn-hover-border-color: var(--brand-primary-hover);
+  --bs-btn-active-bg: var(--brand-primary-active);
+  --bs-btn-active-border-color: var(--brand-primary-active);
+}
+
+.form-control,
+.form-select {
+  --bs-body-bg: var(--surface-raised);
+  --bs-border-color: var(--border-strong);
+}

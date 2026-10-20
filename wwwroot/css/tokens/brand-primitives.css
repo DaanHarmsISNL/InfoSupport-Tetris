@@ -1,0 +1,29 @@
+/*
+ * Brand primitives — Single Brand Source (DR-140)
+ * ------------------------------------------------
+ * Spec: docs/specs/013-brand-styling.md §5.1, §5.2 (DR-140, DR-149, DR-157)
+ *
+ * PLACEHOLDER. Every value in this file stands in for an authoritative Info
+ * Support brand value that could not be found published at infosupport.com /
+ * infosupport.nl (see spec §10 Open Question 1). They are structurally
+ * correct and contrast-checked, but they are NOT Info Support's real brand
+ * colours and must never be presented as such.
+ *
+ * This is the ONLY file that may define brand primitive (`--is-brand-*`,
+ * `--is-accent-*`) values. Replacing these placeholders with authoritative
+ * values — once obtained from Info Support marketing/communications — is a
+ * single-file change: no token name changes, no other stylesheet, page or
+ * component needs to be touched (DR-140, NFR-012, SUC-008).
+ *
+ * `--is-*` tokens are primitives: raw values with no attached meaning. They
+ * must never be consumed directly by a page, component or feature — only by
+ * the semantic tokens defined in tokens.css (DR-139).
+ */
+
+:root {
+  --is-brand-400: #3A6FE8; /* PLACEHOLDER — lighter step, hover */
+  --is-brand-500: #2E5FD9; /* PLACEHOLDER — principal brand colour */
+  --is-brand-600: #2450BC; /* PLACEHOLDER — darker step, pressed state */
+  --is-brand-900: #16213D; /* PLACEHOLDER — deep brand tint, landing hero (012) */
+  --is-accent-400: #E8A33D; /* PLACEHOLDER — sparing emphasis accent */
+}

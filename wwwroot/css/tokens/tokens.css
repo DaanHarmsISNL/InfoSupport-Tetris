@@ -1,0 +1,207 @@
+/*
+ * Design tokens — colour, typography, spacing, geometry and motion
+ * -----------------------------------------------------------------
+ * Spec: docs/specs/013-brand-styling.md §5 (Token Tiering DR-139, Token Name
+ * Stability DR-141, Spacing Scale Exclusivity DR-144, Type Scale Exclusivity
+ * DR-158, Type Roles DR-159).
+ *
+ * Two tiers (DR-139):
+ *   - Primitives (`--is-*`): raw values, no meaning. Defined here (confirmed
+ *     neutrals/signals/board) and in brand-primitives.css (PLACEHOLDER brand
+ *     values). NEVER consumed directly outside this token layer.
+ *   - Semantic tokens (unprefixed, by role): the public, stable contract
+ *     that every page, panel and feature spec consumes. Stories 012 and 014
+ *     style entirely from these names (DR-141, FR-030).
+ *
+ * This file loads after brand-primitives.css, so the brand primitives it
+ * references are already in scope.
+ */
+
+:root {
+  /* ---------------------------------------------------------------------
+   * Primitives — neutrals, signals and board (Confirmed)
+   * Values are this spec's own; they satisfy §5.6's contrast rules and are
+   * not awaiting an external brand reference.
+   * ------------------------------------------------------------------- */
+  --is-neutral-1000: #0B0D12; /* Deepest well. Relative luminance 0.0040 */
+  --is-neutral-950: #15181F;  /* Page background */
+  --is-neutral-900: #1C2029;  /* Raised panel */
+  --is-neutral-800: #2B313C;  /* Hairline divider. 1.36:1 on --surface — decorative only */
+  --is-neutral-500: #6B7689;  /* Strong border. 3.87:1 on --surface, 3.55:1 on --surface-raised */
+  --is-neutral-200: #B9C2D0;  /* Secondary text. 9.89:1 on --surface */
+  --is-neutral-50: #F2F4F8;   /* Primary text. 16.13:1 on --surface */
+  --is-white: #FFFFFF;        /* Focus ring and text on brand */
+  --is-red-400: #FF7A7A;      /* 7.03:1 on --surface */
+  --is-green-400: #5BD88A;    /* 9.84:1 on --surface */
+  --is-amber-400: #F2B23C;    /* 9.48:1 on --surface */
+  --is-edge-dark: #05070B;    /* Block outer border (DR-156) */
+  --is-edge-light: #E8ECF4;   /* Block inner bevel (DR-156). 17.03:1 against --is-edge-dark */
+  --is-grid-line: #262C36;    /* Empty-cell grid. 1.38:1 on --cell-empty — decorative only */
+
+  /* ---------------------------------------------------------------------
+   * Semantic colour tokens — the contract (§5.1)
+   * Stories 012 and 014 use these names and only these names.
+   * ------------------------------------------------------------------- */
+  --surface: var(--is-neutral-950);
+  --surface-raised: var(--is-neutral-900);
+  --surface-sunken: var(--is-neutral-1000);
+  --surface-overlay: rgb(5 7 11 / 82%);
+
+  --border-subtle: var(--is-neutral-800);  /* Decorative only — never the sole carrier of meaning (DR-148) */
+  --border-strong: var(--is-neutral-500);  /* Meaningful boundaries: frame, outlines, structural separators */
+
+  --text-primary: var(--is-neutral-50);
+  --text-secondary: var(--is-neutral-200);
+  /* No --text-muted by design — see spec §5.1 note. A third, dimmer text
+     colour is the most common way a token set drifts below 4.5:1. */
+  --text-on-brand: var(--is-white); /* The ONLY text colour permitted on brand surfaces (DR-149) */
+
+  --brand-primary: var(--is-brand-500);
+  --brand-primary-hover: var(--is-brand-400);
+  --brand-primary-active: var(--is-brand-600);
+  --brand-deep: var(--is-brand-900);
+  --brand-accent: var(--is-accent-400);
+
+  --status-danger: var(--is-red-400);
+  --status-success: var(--is-green-400);
+  --status-warning: var(--is-amber-400);
+
+  --focus-ring: var(--is-white);
+
+  /* ---------------------------------------------------------------------
+   * Semantic colour tokens — the board (§5.1, §5.2)
+   * ------------------------------------------------------------------- */
+  --board-well: var(--surface-sunken);
+  --board-frame: var(--border-strong);
+  --cell-empty: var(--is-neutral-1000);
+  --cell-grid-line: var(--is-grid-line);
+  --cell-edge-dark: var(--is-edge-dark);
+  --cell-edge-light: var(--is-edge-light);
+
+  /* The re-tuned tetromino palette (DR-151, DR-152). Mapping and hues are
+     unchanged from Colour Mapping (DR-24, spec 001) — only the hex values
+     move, to clear contrast, CVD-separation and greyscale-separation floors
+     that the Guideline's CRT-era primaries do not meet on a dark board. */
+  --piece-i: #1FF0E6; /* cyan */
+  --piece-o: #F7F32B; /* yellow */
+  --piece-t: #B470E8; /* purple */
+  --piece-s: #4FC57A; /* green */
+  --piece-z: #DD313C; /* red */
+  --piece-j: #4B5ADD; /* blue */
+  --piece-l: #F97C12; /* orange */
+
+  /* ---------------------------------------------------------------------
+   * Typography — families (§5.3)
+   * `--font-brand` is intentionally left undeclared: the authoritative Info
+   * Support typeface is unknown (spec §10 Open Question 1), and no font
+   * files exist to self-host yet (DR-161, DR-163). Leaving it undeclared
+   * lets `var(--font-brand, ...)` fall through to the confirmed fallback
+   * stacks below, which already satisfy DR-162 (fallback sufficiency) on
+   * their own. When the brand face and its WOFF2 files are obtained, define
+   * `--font-brand` and add the matching @font-face / preload here — no
+   * other token name changes.
+   * ------------------------------------------------------------------- */
+  --font-fallback-sans: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-fallback-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+  --font-display: var(--font-brand, var(--font-fallback-sans));
+  --font-body: var(--font-brand, var(--font-fallback-sans));
+  --font-numeric: var(--font-brand, var(--font-fallback-mono));
+
+  /* ---------------------------------------------------------------------
+   * Typography — scale and roles (§5.3). 1.25 modular scale on a fixed
+   * 16px root (DR-143). No ad-hoc sizes outside this set (DR-158).
+   * ------------------------------------------------------------------- */
+  --font-size-display: 3rem;      /* 48px — display, landing hero (012) */
+  --font-size-h1: 2.5rem;         /* 40px — heading, page titles / game-over headline */
+  --font-size-h2: 2rem;           /* 32px — heading, section headings / leaderboard title */
+  --font-size-h3: 1.5rem;         /* 24px — heading, panel headings */
+  --font-size-body-lg: 1.25rem;   /* 20px — body, lead paragraph (012) */
+  --font-size-body: 1rem;         /* 16px — body, default copy */
+  --font-size-label: 0.875rem;    /* 14px — label. Smallest permitted size (DR-164) */
+  --font-size-numeric: 1.5rem;    /* 24px — numeric, level/lines/leaderboard scores */
+  --font-size-numeric-lg: 2rem;   /* 32px — numeric, live/final score */
+
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---------------------------------------------------------------------
+   * Spacing (DR-144) — 4px base. Every margin, padding and gap comes from
+   * this scale.
+   * ------------------------------------------------------------------- */
+  --space-0: 0;
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+
+  /* ---------------------------------------------------------------------
+   * Radius and borders (§5.4)
+   * ------------------------------------------------------------------- */
+  --radius-sm: 2px;    /* Playfield cells and preview cells */
+  --radius-md: 6px;    /* Panels, buttons, inputs */
+  --radius-lg: 12px;   /* Hero band, game-over dialog */
+  --radius-pill: 999px;/* Badges, leaderboard "your run" marker */
+
+  --border-width-hairline: 1px; /* Dividers, cell edges */
+  --border-width-standard: 2px; /* Inputs, buttons, focus ring */
+  --border-width-frame: 3px;    /* Board frame (DR-157) */
+  --focus-ring-width: 2px;      /* DR-150 */
+  --focus-ring-offset: 2px;
+
+  /* ---------------------------------------------------------------------
+   * Elevation (§5.4). Shadows are a refinement only — elevation is mainly
+   * conveyed by the surface step plus --border-subtle, since a shadow is
+   * nearly invisible on a dark surface.
+   * ------------------------------------------------------------------- */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-overlay: 0 16px 48px rgb(0 0 0 / 60%);
+
+  /* ---------------------------------------------------------------------
+   * Board geometry (§5.4). --cell-size is the single knob that scales the
+   * whole board (DR-166); supported range 20px–32px.
+   * ------------------------------------------------------------------- */
+  --cell-size: 28px;
+  --board-width: calc(var(--cell-size) * 10);
+  --board-height: calc(var(--cell-size) * 20);
+  --viewport-min-width: 1024px;
+  --viewport-min-height: 640px;
+
+  /* ---------------------------------------------------------------------
+   * Motion (§5.5). These govern presentation transitions only — they never
+   * alter gameplay timing (gravity, lock delay, line-clear), which is fixed
+   * by specs 001/006 (DR-165).
+   * ------------------------------------------------------------------- */
+  --duration-instant: 0ms;
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Reduced Motion (DR-165): collapse every duration to instant and let
+   decorative motion disappear. Information-bearing state must already be
+   expressed by a static end state consumers apply immediately when this is
+   active — nothing here suppresses gameplay, which is timed independently
+   of these tokens. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: var(--duration-instant);
+    --duration-base: var(--duration-instant);
+    --duration-slow: var(--duration-instant);
+  }
+}
+
+/* Increased contrast (DR-168): raise the decorative border token to the
+   meaningful one rather than lowering any existing floor. */
+@media (prefers-contrast: more) {
+  :root {
+    --border-subtle: var(--border-strong);
+  }
+}
