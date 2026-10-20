@@ -41,11 +41,21 @@
             Lines: @Model.Session.LinesCleared
         </p>
 
-        @* US-004/DR-21/DR-22: minimal acknowledgement that the session ended (block out or lock
-           out). The GameOver presentation itself (final score, etc.) is story 008's concern. *@
-        @if (Model.Session.Status == GameStatus.GameOver)
+        @* docs/specs/008-game-over.md FR-004/FR-005/FR-007 (US-001/US-002/US-003): an unmistakable,
+           immediate game-over indication together with the frozen final summary -- score, lines
+           cleared, level and pieces spawned, exactly as frozen (DR-104) -- and the reason the run
+           ended (FR-008/FR-009). No animation, countdown or dismissal step (FR-004). *@
+        @if (Model.Session.Status == GameStatus.GameOver && Model.Session.CompletedRun is { } run)
         {
-            <p><strong>Game Over</strong></p>
+            <div role="alert" aria-live="assertive" class="tetris-game-over">
+                <p><strong>Game Over</strong> &mdash; @(run.TopOutReason == TopOutReason.BlockOut ? "no room left to spawn" : "locked out above the field")</p>
+                <p>
+                    Final score: @run.FinalScore &nbsp;|&nbsp;
+                    Lines cleared: @run.LinesCleared &nbsp;|&nbsp;
+                    Level reached: @run.FinalLevel &nbsp;|&nbsp;
+                    Pieces spawned: @run.PiecesSpawned
+                </p>
+            </div>
         }
 
         @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
@@ -80,9 +90,37 @@
             </div>
         </div>
 
-        <form method="post" asp-page-handler="NewGame" class="mt-3">
-            <button type="submit" class="btn btn-secondary">New game</button>
+        @* docs/specs/008-game-over.md FR-011/FR-018: "play again" is the same action as 001
+           FR-005's "New game" (DR-105/DR-23), surfaced here with its game-over label. FR-012/FR-013:
+           reachable from the keyboard alone (see the `R` binding below), one action, no confirm. *@
+        <form method="post" asp-page-handler="NewGame" id="new-game-form" class="mt-3">
+            <button type="submit" class="btn btn-secondary">
+                @(Model.Session.Status == GameStatus.GameOver ? "Play again (R)" : "New game")
+            </button>
         </form>
+
+        @if (Model.Session.Status == GameStatus.GameOver)
+        {
+            <script>
+                // docs/specs/008-game-over.md FR-012/open question 2: `R` triggers play again from
+                // the keyboard alone. `Enter` is deliberately left unbound here for story 009.
+                (function () {
+                    document.addEventListener('keydown', function (event) {
+                        if (event.repeat) {
+                            return;
+                        }
+                        if (event.code !== 'KeyR') {
+                            return;
+                        }
+                        var form = document.getElementById('new-game-form');
+                        if (form) {
+                            event.preventDefault();
+                            form.submit();
+                        }
+                    });
+                })();
+            </script>
+        }
 
         @* Spec 003 (hard drop): Space is bound to this form alone (DR-49). There is no JS
            framework in this project, so the gravity/lock loop is driven by the meta-refresh above

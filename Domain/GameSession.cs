@@ -106,6 +106,29 @@ public sealed class GameSession
     public DateTimeOffset? StartedAt { get; private set; }
 
     /// <summary>
+    /// docs/specs/008-game-over.md §5.1 (GameSession extension): null while Ready or Playing; set
+    /// once, at the move to GameOver, and immutable thereafter (complements <see cref="StartedAt"/>).
+    /// Derived from <see cref="StartedAt"/> plus accumulated simulated play time, never real
+    /// wall-clock time, so it is assertable headlessly (NFR-007) without relying on the UI's
+    /// real-time <see cref="Tick"/> caller.
+    /// </summary>
+    public DateTimeOffset? EndedAt { get; private set; }
+
+    /// <summary>
+    /// docs/specs/008-game-over.md DR-103: null unless and until the session tops out; set exactly
+    /// once, at the transition to GameOver, from the frozen session's values. Never set for a
+    /// session discarded mid-play (DR-103/SC-017).
+    /// </summary>
+    public CompletedRun? CompletedRun { get; private set; }
+
+    /// <summary>
+    /// Bookkeeping for <see cref="EndedAt"/> (DR-103/NFR-007): the sum of every elapsed
+    /// <see cref="Tick"/> delta (post-clamp, DR-26) since <see cref="Start"/>, so the moment of
+    /// game over can be expressed in simulated time without reading the real wall clock.
+    /// </summary>
+    private TimeSpan _elapsedPlayTime = TimeSpan.Zero;
+
+    /// <summary>
     /// Not part of the spec's domain model — bookkeeping for the UI wiring (<c>Pages/Index</c>),
     /// which calls <see cref="Tick"/> with the real elapsed wall-clock time between page
     /// requests. Tests should call <see cref="Tick"/> directly with simulated deltas instead of
@@ -215,10 +238,10 @@ public sealed class GameSession
         if (!Playfield.IsValidPlacement(piece.OccupiedCells))
         {
             // DR-21/FR-021/SC-023 block out: spawn cells already occupied. The piece is not
-            // placed (ActivePiece stays null) and the session ends.
-            PiecesSpawned++;
-            Status = GameStatus.GameOver;
-            Input.Reset(); // DR-28/EC-6: every bound key becomes inert; a held key must be re-pressed.
+            // placed (ActivePiece stays null) and the session ends. docs/specs/008-game-over.md
+            // DR-108: a piece that fails to spawn never spawned, so PiecesSpawned is NOT
+            // incremented here (unlike every other path through this method).
+            CompleteGameOver(TopOutReason.BlockOut);
             return;
         }
 
@@ -438,6 +461,7 @@ public sealed class GameSession
         }
 
         var clamped = elapsed > MaxElapsedPerTick ? MaxElapsedPerTick : elapsed; // DR-26/EC-2
+        _elapsedPlayTime += clamped; // docs/specs/008-game-over.md: simulated-time basis for EndedAt.
         var piece = ActivePiece;
 
         UpdateLowestRowReached(piece); // DR-17: baseline before this tick's movement.
@@ -602,9 +626,8 @@ public sealed class GameSession
         if (isLockOut)
         {
             // DR-85 step 5 / DR-22: points and linesCleared from this lock are already applied
-            // above (FR-021/SC-016), so the final score includes the terminal clear.
-            Status = GameStatus.GameOver;
-            Input.Reset(); // DR-28/EC-6: every bound key becomes inert; a held key must be re-pressed.
+            // above (FR-021/SC-016/SC-011), so the final score includes the terminal clear.
+            CompleteGameOver(TopOutReason.LockOut);
             return;
         }
 
@@ -670,5 +693,36 @@ public sealed class GameSession
     {
         var award = new ScoreAward(points, source, cellCount);
         Score += award.Points;
+    }
+
+    /// <summary>
+    /// docs/specs/008-game-over.md FR-001/FR-002/FR-014 (DR-100..DR-104): the single path by which
+    /// a session reaches <see cref="GameStatus.GameOver"/>, called at the exact instant either
+    /// top-out condition fires (block out in <see cref="SpawnPieceOfType"/>, lock out in
+    /// <see cref="LockActivePiece"/>) and nowhere else (DR-100). Freezes the session (DR-101),
+    /// stamps <see cref="EndedAt"/> and constructs the single immutable <see cref="CompletedRun"/>
+    /// for the whole session (DR-103) from the figures as they stand at this instant -- after any
+    /// terminal line clear has already been resolved by the caller (DR-104/SC-011), and excluding a
+    /// blocked-out piece from <see cref="PiecesSpawned"/> (DR-108, enforced by the caller never
+    /// incrementing it for that case).
+    /// </summary>
+    private void CompleteGameOver(TopOutReason reason)
+    {
+        Status = GameStatus.GameOver;
+        Input.Reset(); // DR-28/EC-6: every bound key becomes inert; a held key must be re-pressed.
+
+        var startedAt = StartedAt ?? DateTimeOffset.UtcNow;
+        var endedAt = startedAt + _elapsedPlayTime;
+        EndedAt = endedAt;
+
+        CompletedRun = new CompletedRun(
+            runId: Id,
+            finalScore: Score,
+            linesCleared: LinesCleared,
+            finalLevel: Level,
+            piecesSpawned: PiecesSpawned,
+            topOutReason: reason,
+            startedAt: startedAt,
+            endedAt: endedAt);
     }
 }

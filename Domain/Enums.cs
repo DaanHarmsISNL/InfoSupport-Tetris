@@ -64,3 +64,17 @@ public enum ScoreSource
     SoftDrop,
     HardDrop
 }
+
+/// <summary>
+/// docs/specs/008-game-over.md §5.4 (DR-100): the closed set of ways a session can reach
+/// <see cref="GameStatus.GameOver"/>. There is no third member and no "unknown" value -- a
+/// <see cref="CompletedRun"/> cannot exist without one of these having fired.
+/// </summary>
+public enum TopOutReason
+{
+    /// <summary>Block Out (DR-21): a piece could not be placed at its spawn position.</summary>
+    BlockOut,
+
+    /// <summary>Lock Out (DR-22): a piece locked with all four of its cells in buffer rows.</summary>
+    LockOut
+}
