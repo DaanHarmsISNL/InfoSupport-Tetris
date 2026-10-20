@@ -33,6 +33,7 @@ Each spec extends or reads the previous one's domain model, so these must land i
    can be built in parallel with it — doing it early avoids retrofitting styling once 012 and
    014 exist. Its brand-colour values are still placeholders pending Info Support's real
    brand guidelines; build against the token *names*, not the current hex values.
+   (implemented — see PR #74)
 
 ## Phase 3 — Compete (sequential)
 

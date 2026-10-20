@@ -19,10 +19,10 @@
 | Field           | Value                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------- |
 | Feature ID      | 013                                                                                           |
-| Status          | Draft                                                                                         |
+| Status          | Implemented                                                                                   |
 | Author          | Daan Harms                                                                                    |
 | Created         | 2026-10-20                                                                                    |
-| Last updated    | 2026-10-20                                                                                    |
+| Last updated    | 2026-10-20 (implemented — PR #74)                                                             |
 | Epic / Parent   | Look like Info Support (story map activity) — `docs/product/story-map.md`                     |
 | Arc42 reference | Sections 2, 5, 8, 9, 10, 12 — see §9.3. All arc42 files are currently empty placeholders.    |
 
