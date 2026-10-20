@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="~/css/tokens/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tokens/base.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/landing.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/controls-panel.css" asp-append-version="true" />
 </head>
 <body>
     @* 5.1 Brand region: banner landmark, skippable, visually part of the hero band (shared
@@ -57,11 +58,18 @@
             @* FR-015/DR-243: no precondition, resolves to 010's stable shareable address. *@
             <a class="landing-leaderboard-link" asp-page="/Leaderboard">View the leaderboard</a>
 
-            @* FR-017/DR-244: story 014 doesn't exist yet -- this is a placeholder entry point into
-               the game page, never auto-opened, ranked third and ranked below the leaderboard. *@
-            <a class="landing-howto-link" asp-page="/Game" asp-fragment="controls">How to play</a>
+            @* FR-017/DR-244: entry point into the controls legend rendered just below, never
+               auto-opened, ranked third and ranked below the leaderboard. *@
+            <a class="landing-howto-link" href="#controls">How to play</a>
         </div>
     </main>
+
+    @* docs/specs/014-controls-panel.md FR-024: the same ControlLegend instance rendered on the
+       game screen, so the two surfaces can never disagree. Rendered here as a normal (not
+       Playing) panel -- there is no GameSession on this page. *@
+    <div class="landing-ways-in" id="controls">
+        @await Html.PartialAsync("_ControlsPanel", Model.ControlsPanel)
+    </div>
 
     @* 5.1 Colophon: optional, unlinked, single line (DR-246). *@
     <footer class="landing-colophon" role="contentinfo">

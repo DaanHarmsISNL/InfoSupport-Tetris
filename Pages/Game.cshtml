@@ -27,6 +27,12 @@
 
         @await Html.PartialAsync("_HoldDisplay", Model.Hold)
         @await Html.PartialAsync("_NextPiecePreview", preview)
+
+        @* docs/specs/014-controls-panel.md DR-266: a permanent region, present before the player
+           even starts -- not something that must be opened at all, in any session state. *@
+        <div id="controls">
+            @await Html.PartialAsync("_ControlsPanel", ControlsPanelViewModel.For(isPlaying: false))
+        </div>
     }
     else
     {
@@ -114,6 +120,13 @@
             <div class="tetris-side-panel">
                 @await Html.PartialAsync("_HoldDisplay", Model.Hold)
                 @await Html.PartialAsync("_NextPiecePreview", preview)
+
+                @* docs/specs/014-controls-panel.md DR-266/FR-009: permanent, fully visible beside
+                   the board throughout Playing; DR-268: non-focusable collapse control while
+                   Playing, via IsPlaying below. *@
+                <div id="controls">
+                    @await Html.PartialAsync("_ControlsPanel", ControlsPanelViewModel.For(isPlaying: Model.Session.Status == GameStatus.Playing))
+                </div>
             </div>
         </div>
 
@@ -289,6 +302,11 @@
         {
             <script>
                 (function () {
+                    // docs/specs/014-controls-panel.md DR-259: this literal is a parallel copy of
+                    // the key set authored in infosupport_tetris.Domain.ControlLegend (the panel's
+                    // single source of truth) and MUST be kept in sync with it by hand -- covered
+                    // by tests/infosupport-tetris.Tests/ControlsPanelTests.cs rather than generated,
+                    // a known gap recorded in ControlLegend's own doc comment.
                     const bindings = {
                         ArrowLeft: 'MoveLeft',
                         ArrowRight: 'MoveRight',

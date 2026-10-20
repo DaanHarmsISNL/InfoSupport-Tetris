@@ -1,3 +1,4 @@
+using infosupport_tetris.Domain;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace infosupport_tetris.Pages;
@@ -11,6 +12,9 @@ namespace infosupport_tetris.Pages;
 /// </summary>
 public class IndexModel : PageModel
 {
+    /// <summary>docs/specs/014-controls-panel.md FR-024: the same legend as the game screen's.</summary>
+    public ControlsPanelViewModel ControlsPanel { get; } = ControlsPanelViewModel.For(isPlaying: false);
+
     public void OnGet()
     {
     }

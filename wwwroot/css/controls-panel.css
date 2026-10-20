@@ -1,0 +1,117 @@
+/*
+ * Controls / how-to-play panel
+ * ------------------------------------------------
+ * Spec: docs/specs/014-controls-panel.md §5.5 (Token Consumption), DR-276 (Tokens Only).
+ * Every colour, size, spacing and radius below is a semantic token published by
+ * wwwroot/css/tokens/tokens.css (spec 013 §5) -- no literal value is introduced here.
+ */
+
+.controls-panel {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--text-secondary);
+  max-width: 20rem;
+}
+
+.controls-panel__heading {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--text-primary);
+}
+
+.controls-panel__legend {
+  list-style: none;
+  margin: 0 0 var(--space-3) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.controls-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.controls-panel__label {
+  color: var(--text-secondary);
+  flex: 1 1 auto;
+}
+
+.controls-panel__keys {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.controls-panel__or {
+  color: var(--text-secondary);
+}
+
+.controls-panel__note {
+  color: var(--text-secondary);
+}
+
+/* Spec 014 §5.5: key caps use --text-primary on --surface-raised with a --border-strong edge --
+   a border, not a fill, so the affordance survives forced-colours mode (DR-168). */
+.key-cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  font-size: var(--font-size-label);
+  line-height: 1;
+}
+
+.controls-panel__how-to-play-list {
+  margin: var(--space-2) 0 0 0;
+  padding: 0 0 0 var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.controls-panel__summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--easing-standard);
+}
+
+/* DR-268: while Playing the control is rendered non-focusable (tabindex="-1") and a default
+   browser disclosure triangle on a non-interactive-looking control would be misleading, so the
+   usual pointer affordance is removed. */
+.controls-panel__summary[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* Focus Visibility (DR-150) / FR-022: shown only when the control can actually receive focus
+   (Ready/GameOver -- tabindex="0"). The browser never focuses a tabindex="-1" element via Tab,
+   so this rule has no effect during Playing. */
+.controls-panel__summary:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* 014 does not define this utility itself -- it is the same pattern already in use in
+   Pages/Leaderboard.cshtml (story 011) for its visually-hidden table caption. Duplicated here
+   (rather than extracted to a shared stylesheet) to keep this partial self-contained per the
+   task's instruction to add a scoped utility if none already exists at the base layer. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
