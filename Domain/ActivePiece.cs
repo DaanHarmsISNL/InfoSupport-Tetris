@@ -115,4 +115,31 @@ public sealed class ActivePiece
         var below = OccupiedCellsAt(new CellPosition(Position.Column, Position.Row + 1));
         return !playfield.IsValidPlacement(below);
     }
+
+    /// <summary>
+    /// Spec 003 — DR-44 (Hard Drop Landing): the largest <c>d</c> &gt;= 0 for which every
+    /// translation of this piece straight down by 0, 1, ..., d cells is a valid placement
+    /// (DR-03/DR-04). <see cref="Position"/>'s column and this piece's orientation are never
+    /// consulted beyond the row they contribute to each candidate, and are never changed by this
+    /// method — it only probes candidate positions, it does not move the piece. Every intermediate
+    /// row is tested one at a time (mirroring gravity's own one-cell-at-a-time stepping), so a
+    /// piece can never tunnel through the stack into a cavity beneath it (EC-4/SC-004/SC-016). For
+    /// an already-grounded piece (DR-15) this returns 0.
+    /// </summary>
+    public int ComputeHardDropDistance(Playfield playfield)
+    {
+        var distance = 0;
+        while (true)
+        {
+            var candidate = new CellPosition(Position.Column, Position.Row + distance + 1);
+            if (!playfield.IsValidPlacement(OccupiedCellsAt(candidate)))
+            {
+                break;
+            }
+
+            distance++;
+        }
+
+        return distance;
+    }
 }

@@ -94,5 +94,34 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    /// <summary>
+    /// Spec 003: hard drop (FR-001..FR-013). The page has no JS framework, so gravity/lock delay
+    /// are driven by auto-refresh (see <see cref="OnGet"/>) and this handler is invoked by a
+    /// dedicated form the page's edge-triggered keydown script submits on `Space` (DR-49, DR-47).
+    /// Catches up gravity/lock-delay time elapsed since the last tick first, exactly as <see cref="OnGet"/>
+    /// does, so a hard drop reflects the same state the player is currently looking at. DR-50 is
+    /// enforced by <see cref="GameSession.HardDrop"/> itself: a request that arrives with no active
+    /// piece or outside <see cref="GameStatus.Playing"/> is simply discarded.
+    /// </summary>
+    public IActionResult OnPostHardDrop()
+    {
+        HttpContext.Session.SetString("touched", "1");
+        var session = _store.Get(SessionId);
+
+        if (session is { Status: GameStatus.Playing })
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (session.LastTickAt is { } lastTick)
+            {
+                session.Tick(now - lastTick);
+            }
+
+            session.LastTickAt = now;
+            session.HardDrop();
+        }
+
+        return RedirectToPage();
+    }
+
     private string SessionId => HttpContext.Session.Id;
 }

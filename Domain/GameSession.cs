@@ -238,6 +238,49 @@ public sealed class GameSession
     }
 
     /// <summary>
+    /// Spec 003 (US-001/US-002/US-004): published by the most recently resolved <see cref="HardDrop"/>
+    /// call, for story 006's scoring (DR-48). Null until the first hard drop of the session; a
+    /// rejected command (DR-50) leaves it unchanged rather than publishing a new outcome.
+    /// </summary>
+    public HardDropOutcome? LastHardDropOutcome { get; private set; }
+
+    /// <summary>
+    /// FR-001..FR-013 (spec 003): slams the active piece straight down to its landing position
+    /// (DR-44) and locks it there in the same step (DR-45/DR-46) -- no gravity step, no further
+    /// input and no rendered frame in between. DR-50: a no-op, returning null, unless
+    /// <see cref="Status"/> is <see cref="GameStatus.Playing"/> and there is an <see cref="ActivePiece"/>;
+    /// the command is discarded rather than queued for a later piece. The running lock delay (if
+    /// any) is discarded, not waited out, and the 15-reset budget is neither consulted, consumed
+    /// nor replenished (DR-45) -- the piece is destroyed by the lock immediately afterwards anyway.
+    /// </summary>
+    public HardDropOutcome? HardDrop()
+    {
+        if (Status != GameStatus.Playing || ActivePiece is null) // DR-50
+        {
+            return null;
+        }
+
+        var piece = ActivePiece;
+        var distance = piece.ComputeHardDropDistance(Playfield); // DR-44
+
+        if (distance > 0)
+        {
+            piece.Position = new CellPosition(piece.Position.Column, piece.Position.Row + distance);
+        }
+
+        // DR-45: the lock delay (if any was running) is discarded, not waited out; the reset
+        // budget is left untouched -- it ceases to exist along with the piece in LockActivePiece.
+        piece.LockTimerElapsed = null;
+
+        var outcome = new HardDropOutcome(distance, piece.Position, piece.Type);
+        LastHardDropOutcome = outcome;
+
+        LockActivePiece(piece); // DR-19, then DR-20/DR-22 -- same resolution path as a gravity lock.
+
+        return outcome;
+    }
+
+    /// <summary>
     /// DR-17: whenever the piece occupies a row lower (larger index) than any it has previously
     /// occupied, its lock reset budget is replenished to <see cref="ActivePiece.MaxLockResets"/>.
     /// </summary>

@@ -66,8 +66,75 @@
         <form method="post" asp-page-handler="NewGame" class="mt-3">
             <button type="submit" class="btn btn-secondary">New game</button>
         </form>
+
+        @* Spec 003 (hard drop): Space is bound to this form alone (DR-49). There is no JS
+           framework in this project, so the gravity/lock loop is driven by the meta-refresh above
+           and hard drop is driven by this dedicated POST, submitted by the edge-triggered keydown
+           listener below rather than by the player clicking a button. *@
+        @if (Model.Session.Status == GameStatus.Playing)
+        {
+            <form method="post" asp-page-handler="HardDrop" id="hard-drop-form" class="d-none"></form>
+        }
     }
 </div>
+
+@section Scripts {
+    @if (Model.Session is { Status: GameStatus.Playing })
+    {
+        <script>
+            // Spec 003 -- DR-47 (edge trigger) / DR-49 (Space only) / DR-51 (arming scope).
+            // `armed` tracks the physical key for the lifetime of this page load: cleared on
+            // key-down, set again only by key-up or by the window losing focus (treated as a
+            // key-up per DR-51/FR-011). Every tick of the game loop (gravity, lock, spawn,
+            // hard drop itself) reloads this page via the meta-refresh or a form POST, which
+            // reinitialises `armed = true` on a fresh script context -- so a key held across a
+            // lock/spawn/game-over boundary never produces a second hard drop (DR-51), because no
+            // new keydown event is dispatched for a key that never went up.
+            (function () {
+                var armed = true;
+
+                function isTypingTarget(target) {
+                    return !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+                }
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.code !== 'Space' && event.key !== ' ') {
+                        return;
+                    }
+
+                    // EC-10: don't swallow Space typed into a text field (e.g. story 009's name entry).
+                    if (isTypingTarget(event.target)) {
+                        return;
+                    }
+
+                    // DR-47: ignore OS autorepeat key-downs and any key-down while already disarmed.
+                    if (event.repeat || !armed) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    armed = false;
+                    event.preventDefault();
+
+                    var form = document.getElementById('hard-drop-form');
+                    if (form) {
+                        form.submit();
+                    }
+                });
+
+                document.addEventListener('keyup', function (event) {
+                    if (event.code === 'Space' || event.key === ' ') {
+                        armed = true; // DR-51: release re-arms the trigger.
+                    }
+                });
+
+                window.addEventListener('blur', function () {
+                    armed = true; // DR-51/FR-011: a missed release must not disable hard drop permanently.
+                });
+            })();
+        </script>
+    }
+}
 
 <style>
     .tetris-playfield {
