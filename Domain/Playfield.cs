@@ -36,4 +36,26 @@ public sealed class Playfield
     /// Used by rendering so the 20 buffer rows are never drawn (DR-01, FR-004).
     /// </summary>
     public Cell GetVisibleCell(int visibleRow, int column) => Cells[BufferRowCount + visibleRow][column];
+
+    /// <summary>
+    /// DR-03 (containment) + DR-04 (no overlap): true when every given cell is within bounds
+    /// and unoccupied. Together these define a <i>valid placement</i>.
+    /// </summary>
+    public bool IsValidPlacement(IEnumerable<CellPosition> cells)
+    {
+        foreach (var cell in cells)
+        {
+            if (cell.Column < 0 || cell.Column >= ColumnCount || cell.Row < 0 || cell.Row >= TotalRowCount)
+            {
+                return false;
+            }
+
+            if (Cells[cell.Row][cell.Column].IsOccupied)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

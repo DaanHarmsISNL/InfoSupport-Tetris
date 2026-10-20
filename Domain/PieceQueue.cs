@@ -1,38 +1,37 @@
 namespace infosupport_tetris.Domain;
 
 /// <summary>
-/// The ordered stream of upcoming tetromino types, fed by the 7-bag randomiser (spec §5.1).
-/// <para>
-/// STUB: the real 7-bag randomiser (DR-09, DR-10, DR-13) is story 002's responsibility (US-002).
-/// This spec (001/US-001) only needs <see cref="GameSession.PieceQueue"/> to exist as a field so
-/// later work can fill it in. To keep SC-002's "queue holds at least seven upcoming types"
-/// assertion meaningful without implementing the bag algorithm, this stub seeds itself with a
-/// fixed, non-random cycle of all seven types repeated. Story 002 should replace the seeding
-/// logic in the constructor with a real <c>SevenBag</c>-backed implementation; the public shape
-/// (<see cref="Upcoming"/>, <see cref="Draw"/>) is intended to remain stable.
-/// </para>
+/// The ordered stream of upcoming tetromino types, fed by the 7-bag randomiser (spec §5.1,
+/// §5.3). Each bag is a uniformly shuffled permutation of all seven types (DR-09), consumed
+/// strictly in bag order and fully before the next is generated (DR-10). The queue always
+/// exposes at least seven upcoming types (DR-13), refilling with fresh bags without
+/// reordering already-queued types. Seedable for reproducibility (FR-012, NFR-006).
 /// </summary>
 public sealed class PieceQueue
 {
     private const int MinimumUpcoming = 7;
 
-    private static readonly TetrominoType[] AllTypes =
-    [
-        TetrominoType.I, TetrominoType.O, TetrominoType.T,
-        TetrominoType.S, TetrominoType.Z, TetrominoType.J, TetrominoType.L
-    ];
+    private readonly Random _random;
 
     public List<TetrominoType> Upcoming { get; } = [];
 
     public int? Seed { get; }
 
+    /// <summary>The bag currently being drained into <see cref="Upcoming"/>.</summary>
+    public SevenBag CurrentBag { get; private set; }
+
     public PieceQueue(int? seed = null)
     {
         Seed = seed;
+        _random = seed.HasValue ? new Random(seed.Value) : new Random();
+        CurrentBag = new SevenBag(_random);
         RefillIfNeeded();
     }
 
-    /// <summary>Draws the next type and refills so at least seven remain (DR-13). Not used by US-001.</summary>
+    /// <summary>
+    /// Draws the next type from the front of the queue and refills so at least seven remain
+    /// (DR-13, FR-009). Never finds an empty queue (EC-14).
+    /// </summary>
     public TetrominoType Draw()
     {
         var next = Upcoming[0];
@@ -45,7 +44,12 @@ public sealed class PieceQueue
     {
         while (Upcoming.Count < MinimumUpcoming)
         {
-            Upcoming.AddRange(AllTypes);
+            if (CurrentBag.IsEmpty)
+            {
+                CurrentBag = new SevenBag(_random);
+            }
+
+            Upcoming.Add(CurrentBag.Draw());
         }
     }
 }

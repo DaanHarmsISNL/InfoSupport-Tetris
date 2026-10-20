@@ -23,6 +23,33 @@ public class IndexModel : PageModel
 
     public GameSession? Session { get; private set; }
 
+    /// <summary>
+    /// US-002 (FR-010..FR-012): the active piece's occupied cells restricted to the 20 visible
+    /// rows and colour-coded by its TetrominoType (DR-24), keyed by (visibleRow, column).
+    /// Buffer-row cells (row &lt; Playfield.BufferRowCount) are omitted so they stay invisible
+    /// per DR-01/FR-004.
+    /// </summary>
+    public IReadOnlyDictionary<(int VisibleRow, int Column), string> ActivePieceVisibleCells
+    {
+        get
+        {
+            var cells = new Dictionary<(int, int), string>();
+            if (Session?.ActivePiece is { } activePiece)
+            {
+                var colour = TetrominoDefinition.For(activePiece.Type).Colour;
+                foreach (var cell in activePiece.OccupiedCells)
+                {
+                    if (cell.Row >= Playfield.BufferRowCount)
+                    {
+                        cells[(cell.Row - Playfield.BufferRowCount, cell.Column)] = colour;
+                    }
+                }
+            }
+
+            return cells;
+        }
+    }
+
     public void OnGet()
     {
         // Touch the session so the cookie is established even on a first-ever visit, otherwise

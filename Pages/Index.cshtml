@@ -24,7 +24,9 @@
         </p>
 
         @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
-           rows above them are never rendered, so a piece occupying only buffer rows is invisible. *@
+           rows above them are never rendered, so a piece occupying only buffer rows is invisible.
+           US-002: the active piece's cells are colour-coded by TetrominoType (DR-24) via
+           Model.ActivePieceVisibleCells, which already excludes buffer-row cells. *@
         <div class="tetris-playfield" role="img" aria-label="Tetris playfield">
             @for (var visibleRow = 0; visibleRow < Playfield.VisibleRowCount; visibleRow++)
             {
@@ -32,8 +34,15 @@
                     @for (var column = 0; column < Playfield.ColumnCount; column++)
                     {
                         var cell = Model.Session.Playfield.GetVisibleCell(visibleRow, column);
-                        var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
-                        <div class="@cssClass"></div>
+                        if (Model.ActivePieceVisibleCells.TryGetValue((visibleRow, column), out var activeColour))
+                        {
+                            <div class="tetris-cell occupied active-piece" style="background-color:@activeColour;"></div>
+                        }
+                        else
+                        {
+                            var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
+                            <div class="@cssClass"></div>
+                        }
                     }
                 </div>
             }
