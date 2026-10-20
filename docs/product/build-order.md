@@ -39,11 +39,16 @@ Each spec extends or reads the previous one's domain model, so these must land i
 
 10. **[009 — Submit a Score](../specs/009-submit-score.md)** — foundation of the activity;
     defines `LeaderboardEntry` and the submission contract, and consumes 008's completed-run
-    hand-off.
+    hand-off. (implemented — commit bd1684f)
 11. **[010 — View the Leaderboard](../specs/010-view-leaderboard.md)** — owns ranking and
-    paging over 009's `LeaderboardEntry`.
+    paging over 009's `LeaderboardEntry`. (implemented — commit 869dced)
 12. **[011 — Highlight My Run](../specs/011-highlight-my-run.md)** — depends on both: matches
     on the `entryId` from 009 and renders inside 010's ranked table.
+    (implemented — commit 7f6e0c1)
+
+Phase 3 is complete: all three specs build, their combined test suite passes (187/187), and
+Phase 4 (012, 014) can now start — 014 was blocked on 002/003/005 existing as code, which they
+already did, and 012 can now link to a real leaderboard (010).
 
 ## Phase 4 — Thin UI shells (last)
 

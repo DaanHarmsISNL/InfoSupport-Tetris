@@ -2,6 +2,8 @@
 
 This documentation follows the [arc42](https://arc42.org) template for architecture documentation.
 
+This documentation describes the architecture of a Tetris game implemented as an ASP.NET Core Razor Pages application (`infosupport_tetris`), hosted in the repository [`DaanHarmsISNL/InfoSupport-Tetris`](https://github.com/DaanHarmsISNL/InfoSupport-Tetris).
+
 ## Table of Contents
 
 1. [Introduction and Goals](01-introduction-and-goals.md)
