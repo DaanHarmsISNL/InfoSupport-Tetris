@@ -56,6 +56,30 @@ public sealed class GameSession
     /// <summary>Spec 002 §5.1/§5.2: the session's single keyboard state, driving its ActivePiece.</summary>
     public InputState Input { get; } = new();
 
+    /// <summary>
+    /// docs/specs/007-levels-and-speed.md DR-94: the highest attainable <see cref="Level"/>. Not
+    /// configurable.
+    /// </summary>
+    public const int LevelCap = 15;
+
+    /// <summary>
+    /// docs/specs/007-levels-and-speed.md §5.3: the normative table of effective gravity
+    /// intervals in whole milliseconds, index 0 = level 1 .. index 14 = level 15. Each value is
+    /// <c>(0.8 - ((level - 1) * 0.007)) ^ (level - 1)</c> seconds (DR-92), rounded to the nearest
+    /// whole millisecond (DR-93). Hard-coded rather than computed at runtime so the curve can
+    /// never drift from the normative table due to platform floating-point differences (DR-93,
+    /// EC-13).
+    /// </summary>
+    private static readonly int[] GravityIntervalMillisecondsByLevel =
+    {
+        1000, 793, 618, 473, 355, 262, 190, 135, 94, 64, 43, 28, 18, 11, 7
+    };
+
+    /// <summary>
+    /// docs/specs/007-levels-and-speed.md DR-90: derived solely from <see cref="LinesCleared"/>
+    /// (story 006's), never written directly except by this derivation. Starts at 1 (DR-23/FR-002)
+    /// and never decreases within a session (DR-91).
+    /// </summary>
     public int Level { get; private set; } = 1;
 
     /// <summary>
@@ -90,11 +114,12 @@ public sealed class GameSession
     public DateTimeOffset? LastTickAt { get; set; }
 
     /// <summary>
-    /// DR-14: time per one-cell descent, derived from <see cref="Level"/>. This spec fixes the
-    /// game at level 1, so this is always 1.000 second; the Guideline curve that varies it by
-    /// level is story 007's concern.
+    /// docs/specs/007-levels-and-speed.md DR-14/DR-92: time per one-cell descent, derived from
+    /// <see cref="Level"/> via the Tetris Guideline curve (§5.3 table). 1.000 s at level 1,
+    /// 7 ms at level 15 (DR-94). A pure function of <see cref="Level"/> alone -- re-derived
+    /// automatically whenever <see cref="Level"/> changes, and at no other time (DR-92).
     /// </summary>
-    public TimeSpan GravityInterval => TimeSpan.FromSeconds(1.0);
+    public TimeSpan GravityInterval => TimeSpan.FromMilliseconds(GravityIntervalMillisecondsByLevel[Level - 1]);
 
     /// <summary>
     /// DR-26/EC-2: the maximum elapsed time a single <see cref="Tick"/> call consumes, so a
@@ -612,7 +637,28 @@ public sealed class GameSession
             AwardScore(result.PointsAwarded, ScoreSource.LineClear); // DR-80.
         }
 
+        // docs/specs/007-levels-and-speed.md DR-90/DR-95/FR-003/FR-015: re-evaluate the level
+        // only here, inside line-clear resolution, between the lock (DR-19) above and the next
+        // spawn (DR-20) below -- so a changed GravityInterval applies from the very next spawn
+        // and never re-times a piece already in flight (there is none at this point, DR-25).
+        RecomputeLevel();
+
         LastLineClear = result;
+    }
+
+    /// <summary>
+    /// docs/specs/007-levels-and-speed.md DR-90: <c>level = min(floor(totalLinesCleared / 10) + 1,
+    /// levelCap)</c>, a pure function of <see cref="LinesCleared"/> and nothing else. DR-91: never
+    /// decreases -- a no-op if the derived value is not greater than the current <see cref="Level"/>.
+    /// </summary>
+    private void RecomputeLevel()
+    {
+        var derivedLevel = Math.Min(LinesCleared / 10 + 1, LevelCap);
+
+        if (derivedLevel > Level)
+        {
+            Level = derivedLevel;
+        }
     }
 
     /// <summary>
