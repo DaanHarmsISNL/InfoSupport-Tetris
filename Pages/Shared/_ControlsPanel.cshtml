@@ -1,0 +1,108 @@
+@model infosupport_tetris.Domain.ControlsPanelViewModel
+@using infosupport_tetris.Domain
+
+@*
+    docs/specs/014-controls-panel.md: a self-contained partial rendering the permanent
+    Controls / how-to-play region (DR-266). Model-bound so it can be included from any page
+    (game screen today at Pages/Index.cshtml; the landing page, story 012, once it exists --
+    see FR-024/EC-15) without this file hard-coding an assumption about its host page's route.
+
+    DR-259: all legend content comes from infosupport_tetris.Domain.ControlLegend / HowToPlay --
+    no key, label or glyph is written in this markup.
+
+    DR-268: while the game is Playing, the collapse control renders non-interactive
+    (tabindex="-1", aria-disabled) so the panel cannot hold focus and swallow a keystroke
+    that DR-267 guarantees belongs to the falling piece. The <details> element itself has no
+    native tabstop (only its <summary> does), so only the summary needs suppressing.
+
+    DR-274: the key legend (the <ol> below) is never gated by IsPlaying or by the stored
+    preference -- only the how-to-play prose is collapsible.
+*@
+
+<aside class="controls-panel" aria-label="Controls">
+    <h2 class="text-h3 controls-panel__heading">Controls</h2>
+
+    <ol class="controls-panel__legend">
+        @foreach (var entry in Model.Legend)
+        {
+            <li class="controls-panel__row">
+                <span class="controls-panel__label text-body">@entry.Label</span>
+                <span class="controls-panel__keys">
+                    @for (var i = 0; i < entry.Keys.Count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            <span class="controls-panel__or text-body"> or </span>
+                        }
+                        var key = entry.Keys[i];
+                        <span class="key-cap">
+                            @if (!string.IsNullOrEmpty(key.Glyph))
+                            {
+                                <span aria-hidden="true">@key.Glyph</span>
+                                <span class="visually-hidden">@key.Name</span>
+                            }
+                            else
+                            {
+                                <span>@key.Name</span>
+                            }
+                        </span>
+                    }
+                </span>
+                @if (!string.IsNullOrEmpty(entry.Note))
+                {
+                    <span class="controls-panel__note text-label">(@entry.Note)</span>
+                }
+            </li>
+        }
+    </ol>
+
+    <details class="controls-panel__how-to-play" id="controls-how-to-play">
+        <summary
+            class="controls-panel__summary text-label"
+            tabindex="@(Model.IsPlaying ? "-1" : "0")"
+            aria-disabled="@(Model.IsPlaying ? "true" : "false")">
+            How to play
+        </summary>
+        <ul class="controls-panel__how-to-play-list text-body">
+            @foreach (var note in Model.HowToPlay)
+            {
+                <li>@note.Text</li>
+            }
+        </ul>
+    </details>
+</aside>
+
+@* DR-273/NFR-008/EC-4/EC-5: every storage read/write is wrapped so a throw, a quota rejection,
+   a disabled-storage browser or a corrupt value always falls back to "expanded" and never
+   surfaces an error. DR-269: this script never touches GameSession. *@
+<script>
+    (function () {
+        var STORAGE_KEY = 'ttr-howtoplay-collapsed';
+        var details = document.getElementById('controls-how-to-play');
+        if (!details) {
+            return;
+        }
+
+        function readCollapsed() {
+            try {
+                return window.localStorage.getItem(STORAGE_KEY) === 'true';
+            } catch (e) {
+                return false; // DR-273/FR-018: unreadable/unavailable storage -> expanded.
+            }
+        }
+
+        function writeCollapsed(value) {
+            try {
+                window.localStorage.setItem(STORAGE_KEY, value ? 'true' : 'false');
+            } catch (e) {
+                // DR-273/NFR-008: quota, disabled storage, private mode -- never surfaced.
+            }
+        }
+
+        details.open = !readCollapsed();
+
+        details.addEventListener('toggle', function () {
+            writeCollapsed(!details.open);
+        });
+    })();
+</script>
