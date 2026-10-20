@@ -17,6 +17,14 @@
     }
     else
     {
+        @* US-003 (DR-14/DR-26): no JS framework exists yet, so gravity is driven server-side by
+           having the page auto-refresh; each GET recomputes GameSession.Tick from the real
+           elapsed wall-clock time (see IndexModel.OnGet). Simple and sufficient to make gravity
+           visible; the spec-tested logic lives entirely in GameSession.Tick, not here. *@
+        @if (Model.Session.Status == GameStatus.Playing)
+        {
+            <meta http-equiv="refresh" content="0.25">
+        }
         <p>
             Status: @Model.Session.Status &nbsp;|&nbsp;
             Level: @Model.Session.Level &nbsp;|&nbsp;

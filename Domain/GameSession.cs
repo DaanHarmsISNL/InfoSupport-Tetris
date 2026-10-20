@@ -33,6 +33,27 @@ public sealed class GameSession
 
     public DateTimeOffset? StartedAt { get; private set; }
 
+    /// <summary>
+    /// Not part of the spec's domain model — bookkeeping for the UI wiring (<c>Pages/Index</c>),
+    /// which calls <see cref="Tick"/> with the real elapsed wall-clock time between page
+    /// requests. Tests should call <see cref="Tick"/> directly with simulated deltas instead of
+    /// relying on this.
+    /// </summary>
+    public DateTimeOffset? LastTickAt { get; set; }
+
+    /// <summary>
+    /// DR-14: time per one-cell descent, derived from <see cref="Level"/>. This spec fixes the
+    /// game at level 1, so this is always 1.000 second; the Guideline curve that varies it by
+    /// level is story 007's concern.
+    /// </summary>
+    public TimeSpan GravityInterval => TimeSpan.FromSeconds(1.0);
+
+    /// <summary>
+    /// DR-26/EC-2: the maximum elapsed time a single <see cref="Tick"/> call consumes, so a
+    /// stalled/backgrounded tab cannot produce a multi-cell catch-up burst.
+    /// </summary>
+    public static readonly TimeSpan MaxElapsedPerTick = TimeSpan.FromMilliseconds(100);
+
     public GameSession(int? pieceQueueSeed = null)
     {
         PieceQueue = new PieceQueue(pieceQueueSeed);
@@ -51,6 +72,7 @@ public sealed class GameSession
 
         Status = GameStatus.Playing;
         StartedAt = now;
+        LastTickAt = now;
 
         // US-002 (FR-010/011): there is no gravity loop yet (story 003), so with nothing else to
         // drive it, the first piece spawns here, immediately on Start. Story 003/004 should call
@@ -118,5 +140,77 @@ public sealed class GameSession
 
         ActivePiece = piece;
         PiecesSpawned++;
+    }
+
+    /// <summary>
+    /// US-003 (FR-013/FR-014/FR-023, DR-14, DR-15, DR-26). Advances the active piece's gravity
+    /// timer by <paramref name="elapsed"/>, capped per call to <see cref="MaxElapsedPerTick"/>
+    /// (DR-26/EC-2), and steps the piece down one cell per whole <see cref="GravityInterval"/>
+    /// that has accumulated — but only while the piece is not grounded (DR-15), and only when
+    /// the step itself is a valid placement (DR-03/DR-04).
+    /// <para>
+    /// A zero or negative <paramref name="elapsed"/> (EC-10, e.g. a clock hiccup) is a no-op:
+    /// the piece never moves up and the timer never runs backwards.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT implemented here (owned by story 004/US-004): once the piece is
+    /// grounded, this method simply stops acting on it — no lock delay timer is started, no
+    /// locking happens, and no next piece spawns. <see cref="ActivePiece.IsGrounded"/> is the
+    /// extension point US-004 builds its lock delay on top of; <see cref="ActivePiece.LockTimerElapsed"/>,
+    /// <see cref="ActivePiece.LockResetsUsed"/> and <see cref="ActivePiece.LowestRowReached"/>
+    /// remain untouched placeholders.
+    /// </para>
+    /// </summary>
+    public void Tick(TimeSpan elapsed)
+    {
+        if (Status != GameStatus.Playing || ActivePiece is null)
+        {
+            return;
+        }
+
+        if (elapsed <= TimeSpan.Zero)
+        {
+            // EC-10: zero/negative delta is treated as zero; never runs backwards.
+            return;
+        }
+
+        var clamped = elapsed > MaxElapsedPerTick ? MaxElapsedPerTick : elapsed; // DR-26/EC-2
+        var piece = ActivePiece;
+
+        if (piece.IsGrounded(Playfield))
+        {
+            // FR-016 (US-004's concern): gravity stops acting on a grounded piece. No lock
+            // delay is started here — that is story 004.
+            return;
+        }
+
+        piece.FallTimerElapsed += clamped;
+
+        // DR-14: exactly one cell per elapsed gravityInterval. The while loop lets accumulated
+        // time (built up over several prior Tick calls) resolve into as many cell-steps as are
+        // due; because a single call is capped to MaxElapsedPerTick (100ms) at level 1's
+        // 1.000s interval, a single call can never itself cross more than one threshold.
+        while (piece.FallTimerElapsed >= GravityInterval)
+        {
+            if (piece.IsGrounded(Playfield))
+            {
+                break;
+            }
+
+            var steppedPosition = new CellPosition(piece.Position.Column, piece.Position.Row + 1);
+            var definition = TetrominoDefinition.For(piece.Type);
+            var steppedCells = definition.SpawnOffsets
+                .Select(o => new CellPosition(steppedPosition.Column + o.ColumnOffset, steppedPosition.Row + o.RowOffset));
+
+            if (!Playfield.IsValidPlacement(steppedCells))
+            {
+                // DR-03/DR-04: never produce an invalid placement, even if groundedness was
+                // somehow stale. Stop trying for this tick.
+                break;
+            }
+
+            piece.Position = steppedPosition;
+            piece.FallTimerElapsed -= GravityInterval;
+        }
     }
 }

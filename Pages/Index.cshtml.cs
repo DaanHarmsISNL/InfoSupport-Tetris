@@ -56,6 +56,22 @@ public class IndexModel : PageModel
         // HttpContext.Session.Id would not be stable across the subsequent POST/redirect.
         HttpContext.Session.SetString("touched", "1");
         Session = _store.Get(SessionId);
+
+        // US-003 (DR-14/DR-26): minimal game-loop wiring. There is no JS framework yet, so the
+        // page auto-refreshes (see the meta-refresh tag in Index.cshtml) and each GET drives
+        // gravity from the real wall-clock time elapsed since the previous tick. This keeps the
+        // spec-tested logic entirely in GameSession.Tick, which is exercised deterministically
+        // by the test suite via simulated deltas rather than real elapsed time.
+        if (Session is { Status: GameStatus.Playing })
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (Session.LastTickAt is { } lastTick)
+            {
+                Session.Tick(now - lastTick);
+            }
+
+            Session.LastTickAt = now;
+        }
     }
 
     /// <summary>FR-001: single action, no data entry, Ready -&gt; Playing.</summary>
