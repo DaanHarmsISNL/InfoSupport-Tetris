@@ -38,3 +38,29 @@ public enum Orientation
     Inverted,
     Left
 }
+
+/// <summary>
+/// docs/specs/006-line-clears-and-scoring.md DR-79: classification of a single lock resolution
+/// by how many rows it cleared. Closed set — a tetromino spans at most four rows (DR-05/DR-87),
+/// so no value above <see cref="Tetris"/> is reachable.
+/// </summary>
+public enum ClearType
+{
+    None,
+    Single,
+    Double,
+    Triple,
+    Tetris
+}
+
+/// <summary>
+/// Spec 006 §5.4: why points were awarded. <see cref="LineClear"/> is multiplied by
+/// <see cref="GameSession.Level"/> (DR-80); <see cref="SoftDrop"/> and <see cref="HardDrop"/> are
+/// not (DR-81).
+/// </summary>
+public enum ScoreSource
+{
+    LineClear,
+    SoftDrop,
+    HardDrop
+}

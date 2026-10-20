@@ -58,7 +58,24 @@ public sealed class GameSession
 
     public int Level { get; private set; } = 1;
 
-    public int Score { get; private set; }
+    /// <summary>
+    /// docs/specs/006-line-clears-and-scoring.md DR-83: the sum of every <see cref="ScoreAward"/>
+    /// made this session. Non-negative, non-decreasing; held as a 64-bit integer so overflow
+    /// cannot arise under any reachable sequence of play.
+    /// </summary>
+    public long Score { get; private set; }
+
+    /// <summary>
+    /// Spec 006 DR-82: cumulative count of rows cleared this session. The single source of truth
+    /// for stories 007 (level) and 008 (game over screen) — neither maintains its own count.
+    /// </summary>
+    public int LinesCleared { get; private set; }
+
+    /// <summary>
+    /// Spec 006 §5.1: the outcome of the most recently resolved lock, including a
+    /// <see cref="Domain.ClearType.None"/> result. Null until the first lock of the session.
+    /// </summary>
+    public LineClearResult? LastLineClear { get; private set; }
 
     public int PiecesSpawned { get; private set; }
 
@@ -450,6 +467,10 @@ public sealed class GameSession
                 if (Input.SoftDropHeld)
                 {
                     piece.SoftDropCells++; // DR-41: only cells descended under soft drop count.
+
+                    // Spec 006 FR-012/DR-81: 1 point per cell, awarded as each cell is descended,
+                    // never multiplied by level.
+                    AwardScore(1, ScoreSource.SoftDrop, cellCount: 1);
                 }
 
                 UpdateLowestRowReached(piece); // DR-17: replenish budget on a new lowest row.
@@ -498,7 +519,14 @@ public sealed class GameSession
         var outcome = new HardDropOutcome(distance, piece.Position, piece.Type);
         LastHardDropOutcome = outcome;
 
-        LockActivePiece(piece); // DR-19, then DR-20/DR-22 -- same resolution path as a gravity lock.
+        // Spec 006 FR-013/DR-81/DR-85 step 1: 2 points per cell travelled, awarded before the
+        // piece's cells are written -- independent of whether the resulting lock clears anything.
+        if (distance > 0)
+        {
+            AwardScore(distance * 2L, ScoreSource.HardDrop, cellCount: distance);
+        }
+
+        LockActivePiece(piece); // DR-19, then line clear resolution, then DR-20/DR-22.
 
         return outcome;
     }
@@ -518,9 +546,11 @@ public sealed class GameSession
     }
 
     /// <summary>
-    /// DR-19: locks <paramref name="piece"/> by writing its four occupied cells into the
-    /// playfield as occupied cells of its type, atomically, and clearing <see cref="ActivePiece"/>.
-    /// Then resolves DR-22 (lock out) or DR-20 (immediate next spawn).
+    /// Spec 006 §5.5 DR-85 — Lock Resolution Sequence: locks <paramref name="piece"/> by writing
+    /// its four occupied cells into the playfield (DR-19), evaluates lock out (DR-22) against
+    /// those pre-collapse positions, then resolves any line clear (detect/collapse/score, DR-75..
+    /// DR-82) before finally moving to GameOver or spawning the next piece. Steps 1-5 of DR-85 are
+    /// atomic (DR-86) -- nothing else is interleaved by this method.
     /// </summary>
     private void LockActivePiece(ActivePiece piece)
     {
@@ -538,16 +568,61 @@ public sealed class GameSession
         // swap loop: a swapped-in piece inherits HoldUsedThisPiece = true until it locks.
         HoldUsedThisPiece = false;
 
-        // DR-22/FR-022/SC-024 lock out: all four cells still in buffer rows (row <= 19).
-        if (cells.All(c => c.Row <= 19))
+        // DR-22/FR-022/SC-024 lock out: all four cells still in buffer rows (row <= 19),
+        // evaluated against the *pre-collapse* positions just written (DR-85 step 3).
+        var isLockOut = cells.All(c => c.Row <= 19);
+
+        ResolveLineClear(); // DR-85 step 4: detect, collapse, counter, score -- before GameOver.
+
+        if (isLockOut)
         {
+            // DR-85 step 5 / DR-22: points and linesCleared from this lock are already applied
+            // above (FR-021/SC-016), so the final score includes the terminal clear.
             Status = GameStatus.GameOver;
             Input.Reset(); // DR-28/EC-6: every bound key becomes inert; a held key must be re-pressed.
             return;
         }
 
-        // DR-20/FR-020/SC-022: the next piece spawns immediately, no entry delay. Spawn() itself
-        // detects DR-21 block out and sets GameStatus.GameOver if the new spawn is blocked.
+        // DR-20/FR-020/SC-022/FR-008: the next piece spawns immediately against the
+        // post-collapse playfield, so a clear that frees the spawn area averts a block out.
         Spawn();
+    }
+
+    /// <summary>
+    /// Spec 006 DR-75/DR-76/DR-77/DR-80/DR-82: runs after every lock, regardless of whether any
+    /// row is full (a <see cref="Domain.ClearType.None"/> result is still recorded, EC-1).
+    /// Detects every full row across all 40 rows, collapses them (DR-77, no cascade per DR-78),
+    /// increments <see cref="LinesCleared"/>, awards line clear points at the <see cref="Level"/>
+    /// in effect before any change this clear causes (DR-84), and records
+    /// <see cref="LastLineClear"/>.
+    /// </summary>
+    private void ResolveLineClear()
+    {
+        var clearedRows = Playfield.DetectFullRows(); // DR-75/DR-76.
+        var result = LineClearResult.For(clearedRows, Level); // DR-79/DR-80/DR-84.
+
+        if (clearedRows.Count > 0)
+        {
+            Playfield.CollapseRows(clearedRows); // DR-77/DR-78.
+            LinesCleared += clearedRows.Count; // DR-82.
+        }
+
+        if (result.PointsAwarded > 0)
+        {
+            AwardScore(result.PointsAwarded, ScoreSource.LineClear); // DR-80.
+        }
+
+        LastLineClear = result;
+    }
+
+    /// <summary>
+    /// Spec 006 DR-83: the sole mutator of <see cref="Score"/> -- adds a non-negative
+    /// <see cref="ScoreAward"/>'s points. There is no operation that subtracts, so
+    /// <see cref="Score"/> is structurally non-decreasing for the session's lifetime.
+    /// </summary>
+    private void AwardScore(long points, ScoreSource source, int? cellCount = null)
+    {
+        var award = new ScoreAward(points, source, cellCount);
+        Score += award.Points;
     }
 }
