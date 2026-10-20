@@ -13,7 +13,7 @@
     @* docs/specs/010-view-leaderboard.md FR-016/DR-193: reachable with no precondition, and
        offers a way to start a game and a way back without ever requiring a finished run. *@
     <p class="leaderboard-actions">
-        <a class="btn btn-primary" asp-page="/Index">Play a game</a>
+        <a class="btn btn-primary" asp-page="/Game">Play a game</a>
         <a class="btn btn-secondary" asp-page="/Index">Back</a>
     </p>
 
@@ -23,7 +23,7 @@
         <div class="leaderboard-empty" role="status">
             <p><strong>No scores yet.</strong></p>
             <p>Nobody has played a game that counted yet. Be the first on the board.</p>
-            <a class="btn btn-primary" asp-page="/Index">Play the first game</a>
+            <a class="btn btn-primary" asp-page="/Game">Play the first game</a>
         </div>
     }
     else

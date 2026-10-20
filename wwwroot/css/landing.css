@@ -1,0 +1,158 @@
+/*
+ * docs/specs/012-landing-page.md -- styling for Pages/Index.cshtml, the landing page.
+ *
+ * DR-241/DR-142: every value below is a semantic token published by 013 Section 5 (see §5.5's
+ * exhaustive list). No literal colour, size, spacing, radius, border width or duration appears
+ * here, and no --is-* primitive is referenced directly.
+ */
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-width: var(--viewport-min-width);
+    min-height: var(--viewport-min-height);
+    font-family: var(--font-body);
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+/* 5.1 Brand + Hero: share --brand-deep so they read as one lockup; the landmark split exists for
+   assistive technology, not for the eye. */
+.landing-brand,
+.landing-hero {
+    background: var(--brand-deep);
+}
+
+.landing-brand {
+    padding: var(--space-6) var(--space-10) var(--space-2);
+}
+
+/* DR-238: a styled text lockup standing in for the (unavailable) Info Support mark, with its own
+   clear space kept free of other text/controls on all sides. */
+.landing-mark {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: var(--font-size-h3);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+}
+
+.landing-hero {
+    box-sizing: border-box;
+    padding: 0 var(--space-10) var(--space-8);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.landing-h1 {
+    margin: 0 0 var(--space-3);
+    font-family: var(--font-display);
+    font-size: var(--font-size-display);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+}
+
+.landing-lead {
+    max-width: 48rem;
+    margin: 0 0 var(--space-6);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body-lg);
+    font-weight: var(--font-weight-regular);
+    color: var(--text-primary);
+}
+
+.landing-primary-form {
+    margin: 0 0 var(--space-8);
+}
+
+/* FR-004/DR-240: the only --brand-primary fill on the page (DR-233). */
+.landing-play-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    border: var(--border-width-standard) solid transparent;
+    border-radius: var(--radius-md);
+    background: var(--brand-primary);
+    color: var(--text-on-brand);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body-lg);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.landing-play-button:hover {
+    background: var(--brand-primary-hover);
+}
+
+.landing-play-button:active {
+    background: var(--brand-primary-active);
+}
+
+/* DR-251/FR-014: visible focus ring at every focus stop, using the published focus tokens. */
+.landing-play-button:focus-visible,
+.landing-leaderboard-link:focus-visible,
+.landing-howto-link:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+}
+
+/* DR-251: decorative key hint, excluded from the accessible name via aria-hidden in the markup. */
+.landing-key-hint {
+    padding: 0 var(--space-2);
+    border: var(--border-width-hairline) solid var(--text-on-brand);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-regular);
+    opacity: 0.8;
+}
+
+/* 5.1 "Ways in": within the main landmark, --surface background, separated from the hero band by
+   --border-subtle (DR-233: subordinate to the primary action -- bordered/unfilled or plain text). */
+.landing-ways-in {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    padding: var(--space-4) var(--space-10);
+    border-top: var(--border-width-hairline) solid var(--border-subtle);
+    background: var(--surface);
+    margin: 0 calc(-1 * var(--space-10)) calc(-1 * var(--space-8));
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.landing-leaderboard-link {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-2) var(--space-4);
+    border: var(--border-width-standard) solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+}
+
+.landing-howto-link {
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-regular);
+    text-decoration: underline;
+}
+
+.landing-colophon {
+    padding: var(--space-2) var(--space-10) var(--space-4);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: var(--font-size-label);
+}
+
+.landing-colophon p {
+    margin: 0;
+}
