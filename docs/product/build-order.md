@@ -55,10 +55,17 @@ already did, and 012 can now link to a real leaderboard (010).
 These are wiring layers over everything built above, so they come last.
 
 13. **[012 — Landing Page](../specs/012-landing-page.md)** — consumes 013's tokens; links to
-    the game (001) and the leaderboard (010).
+    the game (001) and the leaderboard (010). (implemented — the game moved to `/Game`, `/`
+    is now the landing page)
 14. **[014 — Controls Panel](../specs/014-controls-panel.md)** — consumes 013's tokens, and is
     explicitly *generated from* the binding definitions in 002, 003 and 005 — it cannot start
-    until those exist as real code to read from, not just as specs.
+    until those exist as real code to read from, not just as specs. (implemented — see
+    `Domain/ControlLegend.cs` and `Pages/Shared/_ControlsPanel.cshtml`; the inline keyboard JS
+    in `Pages/Game.cshtml` remains a hand-synced parallel literal, enforced by a regression
+    test rather than generated, per DR-259's documented gap)
+
+Phase 4 is complete: both specs build, the combined test suite passes (213/213), and all four
+build-order phases are now implemented.
 
 ## Summary
 
