@@ -1,0 +1,20 @@
+@model infosupport_tetris.Domain.HoldDisplay
+
+@*
+    docs/specs/005-hold-piece.md: renders the derived, read-only HoldDisplay.
+    FR-017/DR-73: the grid is always 4x2, the same fixed footprint whether empty, occupied
+    or swapped.
+    FR-018/NFR-003/DR-73: whenever hold is unavailable the area is rendered with two independent
+    cues -- reduced opacity *and* the "unavailable" class (dashed border / desaturation) -- never
+    colour alone.
+    No form, button or script here: this markup cannot alter GameSession state (mirrors 004's
+    _NextPiecePreview.cshtml).
+*@
+<div class="tetris-hold-caption">@Model.Caption</div>
+<div class="tetris-hold-grid @(Model.IsAvailable ? "" : "unavailable")" role="img" aria-label="@Model.AccessibleName">
+    @foreach (var cell in Model.Cells)
+    {
+        <div class="tetris-hold-cell"
+             style="left:calc(@(cell.Column) * 24px); top:calc(@(cell.Row) * 24px); background-color:@Model.Colour;"></div>
+    }
+</div>

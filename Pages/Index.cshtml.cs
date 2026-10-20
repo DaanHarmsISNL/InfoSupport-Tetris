@@ -12,6 +12,7 @@ namespace infosupport_tetris.Pages;
 /// Spawning, gravity, locking, scoring and game-over presentation are out of scope (see
 /// docs/specs/001-start-new-game.md §1.3) and are left to stories 002-008.
 /// </summary>
+[Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryToken]
 public class IndexModel : PageModel
 {
     private readonly IGameSessionStore _store;
@@ -50,12 +51,33 @@ public class IndexModel : PageModel
         }
     }
 
+    /// <summary>
+    /// docs/specs/004-next-piece-preview.md FR-006/SC-002: the preview must already show the
+    /// first upcoming type before the player ever presses Start, so a Ready GameSession is
+    /// constructed and stored on first visit rather than only on OnPostStart. This adds no new
+    /// state beyond what 001 already models (a Ready session with no active piece).
+    /// </summary>
+    public NextPiecePreview Preview => Session?.NextPiecePreview
+        ?? NextPiecePreview.For(new GameSession());
+
+    /// <summary>docs/specs/005-hold-piece.md FR-016/FR-019: empty and unavailable before Session exists.</summary>
+    public HoldDisplay Hold => Session is not null
+        ? HoldDisplay.For(Session)
+        : HoldDisplay.For(new GameSession());
+
     public void OnGet()
     {
         // Touch the session so the cookie is established even on a first-ever visit, otherwise
         // HttpContext.Session.Id would not be stable across the subsequent POST/redirect.
         HttpContext.Session.SetString("touched", "1");
         Session = _store.Get(SessionId);
+
+        if (Session is null)
+        {
+            // FR-006: a Ready session must exist before Start is pressed so its preview can be
+            // read (EC-1). No gameplay starts here — Status stays Ready until OnPostStart.
+            Session = _store.Replace(SessionId, new GameSession());
+        }
 
         // US-003 (DR-14/DR-26): minimal game-loop wiring. There is no JS framework yet, so the
         // page auto-refreshes (see the meta-refresh tag in Index.cshtml) and each GET drives
@@ -92,6 +114,127 @@ public class IndexModel : PageModel
         session.Start(DateTimeOffset.UtcNow);
         _store.Replace(SessionId, session);
         return RedirectToPage();
+    }
+
+    /// <summary>
+    /// Spec 003: hard drop (FR-001..FR-013). The page has no JS framework, so gravity/lock delay
+    /// are driven by auto-refresh (see <see cref="OnGet"/>) and this handler is invoked by a
+    /// dedicated form the page's edge-triggered keydown script submits on `Space` (DR-49, DR-47).
+    /// Catches up gravity/lock-delay time elapsed since the last tick first, exactly as <see cref="OnGet"/>
+    /// does, so a hard drop reflects the same state the player is currently looking at. DR-50 is
+    /// enforced by <see cref="GameSession.HardDrop"/> itself: a request that arrives with no active
+    /// piece or outside <see cref="GameStatus.Playing"/> is simply discarded.
+    /// </summary>
+    public IActionResult OnPostHardDrop()
+    {
+        HttpContext.Session.SetString("touched", "1");
+        var session = _store.Get(SessionId);
+
+        if (session is { Status: GameStatus.Playing })
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (session.LastTickAt is { } lastTick)
+            {
+                session.Tick(now - lastTick);
+            }
+
+            session.LastTickAt = now;
+            session.HardDrop();
+        }
+
+        return RedirectToPage();
+    }
+
+    /// <summary>
+    /// Spec 002 FR-002/DR-29: the handler every bound key's client-side script posts to. Ticks
+    /// gravity/soft-drop up to "now" first (DR-43: gravity for elapsed time, then this input) and
+    /// applies exactly one <see cref="InputCommand"/>, gated by <see cref="GameSession"/> itself
+    /// per DR-28. Returns 204 — the page's own auto-refresh (meta-refresh) re-renders the board;
+    /// this endpoint exists only to deliver the command with low latency between refreshes.
+    /// </summary>
+    public IActionResult OnPostInput(InputCommand command)
+    {
+        var session = _store.Get(SessionId);
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        // docs/specs/005-hold-piece.md DR-72: a hold must resolve *before* fall and lock timers
+        // advance within the same update step, so it beats an expiring lock delay (SC-014). Every
+        // other command here ticks gravity up to "now" first (DR-43); Hold is the one exception
+        // and is applied against the state as it was at the end of the previous tick.
+        if (command == InputCommand.Hold)
+        {
+            if (session.Status == GameStatus.Playing)
+            {
+                session.Hold();
+            }
+
+            session.LastTickAt = DateTimeOffset.UtcNow;
+            return new NoContentResult();
+        }
+
+        if (session.Status == GameStatus.Playing)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (session.LastTickAt is { } lastTick)
+            {
+                session.Tick(now - lastTick);
+            }
+
+            session.LastTickAt = now;
+        }
+
+        switch (command)
+        {
+            case InputCommand.MoveLeft:
+                session.PressLeft();
+                break;
+            case InputCommand.MoveRight:
+                session.PressRight();
+                break;
+            case InputCommand.RotateClockwise:
+                session.RotateClockwise();
+                break;
+            case InputCommand.RotateCounterClockwise:
+                session.RotateCounterClockwise();
+                break;
+            case InputCommand.SoftDropStart:
+                session.PressSoftDrop();
+                break;
+            case InputCommand.SoftDropEnd:
+                session.ReleaseSoftDrop();
+                break;
+        }
+
+        return new NoContentResult();
+    }
+
+    /// <summary>Spec 002 DR-31/DR-32/EC-7/EC-8: a direction key was released (or focus was lost,
+    /// in which case the client releases both).</summary>
+    public IActionResult OnPostRelease(InputCommand command)
+    {
+        var session = _store.Get(SessionId);
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        switch (command)
+        {
+            case InputCommand.MoveLeft:
+                session.ReleaseLeft();
+                break;
+            case InputCommand.MoveRight:
+                session.ReleaseRight();
+                break;
+            case InputCommand.SoftDropEnd:
+                session.ReleaseSoftDrop();
+                break;
+        }
+
+        return new NoContentResult();
     }
 
     private string SessionId => HttpContext.Session.Id;
