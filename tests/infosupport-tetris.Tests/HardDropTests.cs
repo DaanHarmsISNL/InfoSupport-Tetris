@@ -259,10 +259,10 @@ public class HardDropTests
         Assert.Null(session.ActivePiece);
     }
 
-    // SC-014: the travelled distance is handed to scoring via HardDropOutcome, with no change to
-    // score itself (003 owns nothing of story 006's scoring).
+    // SC-014/SC-018 (spec 006 DR-81): the travelled distance is handed to scoring via
+    // HardDropOutcome, and story 006 converts it to 2 points per cell travelled.
     [Fact]
-    public void HardDrop_PublishesCellsTravelled_WithoutTouchingScore()
+    public void HardDrop_PublishesCellsTravelled_AndAwardsTwoPointsPerCell()
     {
         var session = new GameSession(pieceQueueSeed: 23);
         session.Start(DateTimeOffset.UtcNow);
@@ -271,7 +271,7 @@ public class HardDropTests
         var outcome = session.HardDrop();
 
         Assert.True(outcome!.CellsTravelled > 0);
-        Assert.Equal(scoreBefore, session.Score);
+        Assert.Equal(scoreBefore + outcome.CellsTravelled * 2, session.Score);
     }
 
     // SUC-002-style property: hard drop lands exactly where repeated single-cell descents would.

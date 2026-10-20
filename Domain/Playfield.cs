@@ -58,4 +58,87 @@ public sealed class Playfield
 
         return true;
     }
+
+    /// <summary>
+    /// docs/specs/006-line-clears-and-scoring.md DR-75/DR-76: scans all 40 rows (buffer and
+    /// visible alike) and returns the indices of every full row, in ascending order. A row is
+    /// full exactly when all 10 of its cells are occupied.
+    /// </summary>
+    public IReadOnlyList<int> DetectFullRows()
+    {
+        var fullRows = new List<int>();
+        for (var row = 0; row < TotalRowCount; row++)
+        {
+            var isFull = true;
+            for (var column = 0; column < ColumnCount; column++)
+            {
+                if (!Cells[row][column].IsOccupied)
+                {
+                    isFull = false;
+                    break;
+                }
+            }
+
+            if (isFull)
+            {
+                fullRows.Add(row);
+            }
+        }
+
+        return fullRows;
+    }
+
+    /// <summary>
+    /// DR-77 — Row Collapse: removes every row in <paramref name="clearedRows"/> and shifts each
+    /// surviving row down by the number of cleared rows below it, as a single simultaneous
+    /// remapping. The topmost <c>clearedRows.Count</c> rows end up entirely empty. No block ever
+    /// changes column or moves upward (verified by SC-004/SC-005: the non-adjacent case). A no-op
+    /// when <paramref name="clearedRows"/> is empty (DR-78: no cascade/re-settling happens here or
+    /// ever).
+    /// </summary>
+    public void CollapseRows(IReadOnlyList<int> clearedRows)
+    {
+        if (clearedRows.Count == 0)
+        {
+            return;
+        }
+
+        var cleared = new HashSet<int>(clearedRows);
+
+        // Build the new grid by, for every destination row from the bottom up, finding the
+        // surviving source row that maps onto it. Working bottom-to-top lets each destination
+        // row simply consume the next not-yet-placed surviving row above it (and above any
+        // already-consumed rows), honoring DR-77's "shift down by cleared rows below it" rule.
+        var newRows = new Cell[TotalRowCount][];
+        var sourceRow = TotalRowCount - 1;
+        for (var destRow = TotalRowCount - 1; destRow >= 0; destRow--)
+        {
+            while (sourceRow >= 0 && cleared.Contains(sourceRow))
+            {
+                sourceRow--;
+            }
+
+            if (sourceRow >= 0)
+            {
+                newRows[destRow] = Cells[sourceRow];
+                sourceRow--;
+            }
+            else
+            {
+                // Topmost rows left after surviving rows run out become entirely empty.
+                var emptyRow = new Cell[ColumnCount];
+                for (var column = 0; column < ColumnCount; column++)
+                {
+                    emptyRow[column] = new Cell();
+                }
+
+                newRows[destRow] = emptyRow;
+            }
+        }
+
+        for (var row = 0; row < TotalRowCount; row++)
+        {
+            Cells[row] = newRows[row];
+        }
+    }
 }
