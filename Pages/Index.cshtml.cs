@@ -12,6 +12,7 @@ namespace infosupport_tetris.Pages;
 /// Spawning, gravity, locking, scoring and game-over presentation are out of scope (see
 /// docs/specs/001-start-new-game.md §1.3) and are left to stories 002-008.
 /// </summary>
+[Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryToken]
 public class IndexModel : PageModel
 {
     private readonly IGameSessionStore _store;
@@ -92,6 +93,83 @@ public class IndexModel : PageModel
         session.Start(DateTimeOffset.UtcNow);
         _store.Replace(SessionId, session);
         return RedirectToPage();
+    }
+
+    /// <summary>
+    /// Spec 002 FR-002/DR-29: the handler every bound key's client-side script posts to. Ticks
+    /// gravity/soft-drop up to "now" first (DR-43: gravity for elapsed time, then this input) and
+    /// applies exactly one <see cref="InputCommand"/>, gated by <see cref="GameSession"/> itself
+    /// per DR-28. Returns 204 — the page's own auto-refresh (meta-refresh) re-renders the board;
+    /// this endpoint exists only to deliver the command with low latency between refreshes.
+    /// </summary>
+    public IActionResult OnPostInput(InputCommand command)
+    {
+        var session = _store.Get(SessionId);
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        if (session.Status == GameStatus.Playing)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (session.LastTickAt is { } lastTick)
+            {
+                session.Tick(now - lastTick);
+            }
+
+            session.LastTickAt = now;
+        }
+
+        switch (command)
+        {
+            case InputCommand.MoveLeft:
+                session.PressLeft();
+                break;
+            case InputCommand.MoveRight:
+                session.PressRight();
+                break;
+            case InputCommand.RotateClockwise:
+                session.RotateClockwise();
+                break;
+            case InputCommand.RotateCounterClockwise:
+                session.RotateCounterClockwise();
+                break;
+            case InputCommand.SoftDropStart:
+                session.PressSoftDrop();
+                break;
+            case InputCommand.SoftDropEnd:
+                session.ReleaseSoftDrop();
+                break;
+        }
+
+        return new NoContentResult();
+    }
+
+    /// <summary>Spec 002 DR-31/DR-32/EC-7/EC-8: a direction key was released (or focus was lost,
+    /// in which case the client releases both).</summary>
+    public IActionResult OnPostRelease(InputCommand command)
+    {
+        var session = _store.Get(SessionId);
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        switch (command)
+        {
+            case InputCommand.MoveLeft:
+                session.ReleaseLeft();
+                break;
+            case InputCommand.MoveRight:
+                session.ReleaseRight();
+                break;
+            case InputCommand.SoftDropEnd:
+                session.ReleaseSoftDrop();
+                break;
+        }
+
+        return new NoContentResult();
     }
 
     private string SessionId => HttpContext.Session.Id;
