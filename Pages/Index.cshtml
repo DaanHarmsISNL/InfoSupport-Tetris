@@ -21,6 +21,7 @@
             <button type="submit" class="btn btn-primary btn-lg">Start game</button>
         </form>
 
+        @await Html.PartialAsync("_HoldDisplay", Model.Hold)
         @await Html.PartialAsync("_NextPiecePreview", preview)
     }
     else
@@ -73,6 +74,7 @@
             </div>
 
             <div class="tetris-side-panel">
+                @await Html.PartialAsync("_HoldDisplay", Model.Hold)
                 @await Html.PartialAsync("_NextPiecePreview", preview)
             </div>
         </div>
@@ -108,7 +110,11 @@
                         KeyX: 'RotateClockwise',
                         KeyZ: 'RotateCounterClockwise',
                         ControlLeft: 'RotateCounterClockwise',
-                        ControlRight: 'RotateCounterClockwise'
+                        ControlRight: 'RotateCounterClockwise',
+                        // docs/specs/005-hold-piece.md DR-63: `C` or either `Shift`, key-down edge only.
+                        KeyC: 'Hold',
+                        ShiftLeft: 'Hold',
+                        ShiftRight: 'Hold'
                     };
 
                     const held = new Set();
@@ -277,5 +283,38 @@
         height: 24px;
         box-sizing: border-box;
         border: 1px solid #222;
+    }
+
+    /* docs/specs/005-hold-piece.md DR-73: same fixed 4x2 footprint as the preview grid, so
+       neither resizes or reflows as the hold slot fills, empties or swaps. */
+    .tetris-hold-caption {
+        font-weight: bold;
+        margin-bottom: 4px;
+    }
+
+    .tetris-hold-grid {
+        position: relative;
+        width: calc(4 * 24px);
+        height: calc(2 * 24px);
+        border: 2px solid #333;
+        background: #111;
+        box-sizing: border-box;
+        margin-bottom: 12px;
+    }
+
+    .tetris-hold-cell {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        box-sizing: border-box;
+        border: 1px solid #222;
+    }
+
+    /* NFR-003: unavailable is conveyed by >= 2 independent cues -- reduced opacity *and* a
+       desaturated/dashed, non-colour cue -- never colour or opacity alone. */
+    .tetris-hold-grid.unavailable {
+        opacity: 0.4;
+        border-style: dashed;
+        filter: grayscale(60%);
     }
 </style>

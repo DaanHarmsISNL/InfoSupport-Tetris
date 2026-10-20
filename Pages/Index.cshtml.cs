@@ -60,6 +60,11 @@ public class IndexModel : PageModel
     public NextPiecePreview Preview => Session?.NextPiecePreview
         ?? NextPiecePreview.For(new GameSession());
 
+    /// <summary>docs/specs/005-hold-piece.md FR-016/FR-019: empty and unavailable before Session exists.</summary>
+    public HoldDisplay Hold => Session is not null
+        ? HoldDisplay.For(Session)
+        : HoldDisplay.For(new GameSession());
+
     public void OnGet()
     {
         // Touch the session so the cookie is established even on a first-ever visit, otherwise
@@ -153,6 +158,21 @@ public class IndexModel : PageModel
         if (session is null)
         {
             return NotFound();
+        }
+
+        // docs/specs/005-hold-piece.md DR-72: a hold must resolve *before* fall and lock timers
+        // advance within the same update step, so it beats an expiring lock delay (SC-014). Every
+        // other command here ticks gravity up to "now" first (DR-43); Hold is the one exception
+        // and is applied against the state as it was at the end of the previous tick.
+        if (command == InputCommand.Hold)
+        {
+            if (session.Status == GameStatus.Playing)
+            {
+                session.Hold();
+            }
+
+            session.LastTickAt = DateTimeOffset.UtcNow;
+            return new NoContentResult();
         }
 
         if (session.Status == GameStatus.Playing)

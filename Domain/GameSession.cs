@@ -33,6 +33,26 @@ public sealed class GameSession
     /// </summary>
     public NextPiecePreview NextPiecePreview => NextPiecePreview.For(this);
 
+    /// <summary>
+    /// docs/specs/005-hold-piece.md §5.1: the single stashed tetromino type. Null on a fresh
+    /// session (DR-74) and never holds a position, orientation or timer (DR-64).
+    /// </summary>
+    public TetrominoType? HeldType { get; private set; }
+
+    /// <summary>
+    /// docs/specs/005-hold-piece.md §5.1: whether hold has already been accepted for the current
+    /// <see cref="ActivePiece"/>. Set true on an accepted hold (DR-68); cleared only when a piece
+    /// locks (DR-69) — never on a spawn.
+    /// </summary>
+    public bool HoldUsedThisPiece { get; private set; }
+
+    /// <summary>
+    /// docs/specs/005-hold-piece.md §5.1: derived, never stored. True exactly when a hold press
+    /// would be accepted — the single condition both <see cref="Hold"/> (FR-013) and the hold
+    /// display (FR-018) read, so the key's behaviour and the display can never disagree.
+    /// </summary>
+    public bool HoldAvailable => Status == GameStatus.Playing && ActivePiece is not null && !HoldUsedThisPiece;
+
     /// <summary>Spec 002 §5.1/§5.2: the session's single keyboard state, driving its ActivePiece.</summary>
     public InputState Input { get; } = new();
 
@@ -120,6 +140,18 @@ public sealed class GameSession
         }
 
         var type = PieceQueue.Draw();
+        SpawnPieceOfType(type);
+    }
+
+    /// <summary>
+    /// docs/specs/005-hold-piece.md DR-67: the one spawn behaviour in the system, shared by a
+    /// post-lock <see cref="Spawn"/> and a hold-swapped-in piece via <see cref="Hold"/>. Callers
+    /// are responsible for drawing/selecting <paramref name="type"/> and for ensuring
+    /// <see cref="ActivePiece"/> is already null (no outgoing piece's cells are ever written
+    /// here — that is DR-09/DR-64's job, done by the caller before this runs).
+    /// </summary>
+    private void SpawnPieceOfType(TetrominoType type)
+    {
         var definition = TetrominoDefinition.For(type);
 
         var minColumnOffset = definition.SpawnOffsets.Min(o => o.ColumnOffset);
@@ -160,6 +192,47 @@ public sealed class GameSession
 
         ActivePiece = piece;
         PiecesSpawned++;
+    }
+
+    /// <summary>
+    /// docs/specs/005-hold-piece.md FR-001..FR-015: stash the falling piece, or swap it with the
+    /// held one. DR-70: a no-op (returns false, no state change at all) unless
+    /// <see cref="HoldAvailable"/> is true. DR-72: callers must resolve a pending hold before any
+    /// gravity/lock-timer advance within the same update step (<see cref="Tick"/> itself never
+    /// calls this; <c>Pages/Index.cshtml.cs</c> is responsible for calling it first).
+    /// </summary>
+    public bool Hold()
+    {
+        if (!HoldAvailable) // DR-68/DR-70
+        {
+            return false;
+        }
+
+        var outgoingType = ActivePiece!.Type;
+        HoldUsedThisPiece = true; // DR-68: at most one accepted hold per piece.
+        ActivePiece = null; // FR-009/DR-70: discarded without writing any cell to the Playfield.
+
+        TetrominoType incomingType;
+        if (HeldType is null)
+        {
+            // DR-65: empty slot -- stash the outgoing type and draw the incoming one from the
+            // queue (which refills itself per DR-13), advancing story 004's preview by one.
+            HeldType = outgoingType;
+            incomingType = PieceQueue.Draw();
+        }
+        else
+        {
+            // DR-66: occupied slot -- exchange types; nothing is drawn from the queue, so the
+            // preview (story 004) is left completely unchanged.
+            incomingType = HeldType.Value;
+            HeldType = outgoingType;
+        }
+
+        // DR-67: the incoming piece is a genuinely new ActivePiece via the single spawn path --
+        // standard placement, fresh timers, full reset budget, the DR-08 initial drop. This can
+        // itself detect DR-21 block out and move the session to GameOver (DR-71).
+        SpawnPieceOfType(incomingType);
+        return true;
     }
 
     /// <summary>DR-28: input affects the game only while Playing with an ActivePiece.</summary>
@@ -459,6 +532,11 @@ public sealed class GameSession
         }
 
         ActivePiece = null;
+
+        // docs/specs/005-hold-piece.md DR-69: hold availability is cleared by a lock, and at no
+        // other moment -- in particular not by a spawn. This is what prevents an infinite hold
+        // swap loop: a swapped-in piece inherits HoldUsedThisPiece = true until it locks.
+        HoldUsedThisPiece = false;
 
         // DR-22/FR-022/SC-024 lock out: all four cells still in buffer rows (row <= 19).
         if (cells.All(c => c.Row <= 19))

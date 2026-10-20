@@ -11,5 +11,8 @@ public enum InputCommand
     RotateClockwise,
     RotateCounterClockwise,
     SoftDropStart,
-    SoftDropEnd
+    SoftDropEnd,
+
+    /// <summary>docs/specs/005-hold-piece.md DR-63: `C` or either `Shift`, key-down edge only.</summary>
+    Hold
 }
