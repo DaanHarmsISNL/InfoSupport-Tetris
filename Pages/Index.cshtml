@@ -56,6 +56,21 @@
                     Pieces spawned: @run.PiecesSpawned
                 </p>
             </div>
+
+            @* docs/specs/009-submit-score.md FR-001/FR-012: the name field + submit + skip, reachable
+               from the keyboard alone and deliberately NOT auto-focused (open question 3, so 008's
+               `R` play-again binding above is never swallowed as typed text). The actual submission
+               state machine (SubmissionStatus, §5.1) runs client-side in the script below, since no
+               JS framework/SPA exists in this project (009 §9.2/FR-016..FR-020). *@
+            <div class="tetris-score-submission" data-run-id="@run.RunId" data-score="@run.FinalScore"
+                 data-lines-cleared="@run.LinesCleared" data-level="@run.FinalLevel">
+                <label for="player-name-input">Your name</label>
+                <input type="text" id="player-name-input" maxlength="20" autocomplete="off"
+                       aria-describedby="submission-status" />
+                <button type="button" id="submit-score-button">Submit score</button>
+                <button type="button" id="skip-score-button">Skip</button>
+                <p id="submission-status" role="status" aria-live="polite"></p>
+            </div>
         }
 
         @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
@@ -118,6 +133,117 @@
                             form.submit();
                         }
                     });
+                })();
+            </script>
+
+            <script>
+                // docs/specs/009-submit-score.md: the ScoreSubmission state machine (§5.1) for the
+                // one finished run on this page. Entirely client-side -- there is no JS framework in
+                // this project, so this plain script owns Unsubmitted/Submitting/Submitted/Failed/
+                // Declined (§5.4) for the lifetime of this page load, exactly as long as the
+                // game-over state is shown (DR-106).
+                (function () {
+                    var container = document.querySelector('.tetris-score-submission');
+                    if (!container) {
+                        return;
+                    }
+
+                    var runId = container.dataset.runId;
+                    var score = Number(container.dataset.score);
+                    var linesCleared = Number(container.dataset.linesCleared);
+                    var level = Number(container.dataset.level);
+
+                    var nameInput = document.getElementById('player-name-input');
+                    var submitButton = document.getElementById('submit-score-button');
+                    var skipButton = document.getElementById('skip-score-button');
+                    var statusEl = document.getElementById('submission-status');
+
+                    // DR-115/DR-117/DR-125: closed over this run only -- Submitted/Declined are
+                    // terminal and a submit while Submitting is ignored outright, never queued.
+                    var status = 'Unsubmitted';
+
+                    function setStatus(message) {
+                        statusEl.textContent = message;
+                    }
+
+                    function submit() {
+                        // DR-125/FR-020: ignore a submit activation while one is already in flight.
+                        if (status === 'Submitting' || status === 'Submitted') {
+                            return;
+                        }
+
+                        status = 'Submitting';
+                        setStatus('Submitting...');
+
+                        var controller = new AbortController();
+                        // DR-128/FR-017: abandon after 10 seconds and report it as failed.
+                        var timeoutId = setTimeout(function () { controller.abort(); }, 10000);
+
+                        fetch('?handler=SubmitScore', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: controller.signal,
+                            body: JSON.stringify({
+                                runId: runId,
+                                playerName: nameInput.value,
+                                score: score,
+                                linesCleared: linesCleared,
+                                level: level
+                            })
+                        })
+                            .then(function (response) {
+                                clearTimeout(timeoutId);
+                                if (!response.ok) {
+                                    throw new Error('server error');
+                                }
+                                return response.json();
+                            })
+                            .then(function (result) {
+                                if (result.success) {
+                                    // DR-119/DR-126: the server's storedName is authoritative, never
+                                    // the field contents -- a retry after a lost response may return
+                                    // a name the player has since edited (EC-4).
+                                    status = 'Submitted';
+                                    nameInput.value = result.playerName;
+                                    nameInput.disabled = true;
+                                    submitButton.disabled = true;
+                                    setStatus('Submitted! Your score is on the board.');
+                                } else {
+                                    status = 'Failed';
+                                    setStatus(result.failureMessage || 'The submission was refused.');
+                                }
+                            })
+                            .catch(function (error) {
+                                clearTimeout(timeoutId);
+                                status = 'Failed';
+                                // FR-018/DR-127: the typed name and the run stay intact; a retry is available.
+                                setStatus(error.name === 'AbortError'
+                                    ? 'The submission timed out. You can try again.'
+                                    : 'The submission failed. You can try again.');
+                            });
+                    }
+
+                    submitButton.addEventListener('click', submit);
+
+                    // FR-012: Enter submits while the name field has focus.
+                    nameInput.addEventListener('keydown', function (event) {
+                        if (event.code === 'Enter' || event.key === 'Enter') {
+                            event.preventDefault();
+                            submit();
+                        }
+                    });
+
+                    // DR-116/DR-117/FR-013/FR-015: skip discards the run silently, nothing sent.
+                    skipButton.addEventListener('click', function () {
+                        status = 'Declined';
+                        nameInput.disabled = true;
+                        submitButton.disabled = true;
+                        skipButton.disabled = true;
+                        setStatus('Skipped.');
+                    });
+
+                    // FR-014/DR-129: play again is never blocked by submission state. The "R" and
+                    // click handlers for #new-game-form are entirely independent of this script.
                 })();
             </script>
         }

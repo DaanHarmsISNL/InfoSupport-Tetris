@@ -78,3 +78,59 @@ public enum TopOutReason
     /// <summary>Lock Out (DR-22): a piece locked with all four of its cells in buffer rows.</summary>
     LockOut
 }
+
+/// <summary>
+/// docs/specs/009-submit-score.md §5.4: where one <see cref="ScoreSubmission"/> has got to.
+/// Closed set. <see cref="Submitted"/> and <see cref="Declined"/> are terminal (DR-115, DR-117).
+/// </summary>
+public enum SubmissionStatus
+{
+    /// <summary>A finished run is available and nothing has been sent. The initial state.</summary>
+    Unsubmitted,
+
+    /// <summary>An attempt is in flight. Further submit activations are ignored (DR-125). Bounded by DR-128.</summary>
+    Submitting,
+
+    /// <summary>Terminal. An entry exists for this run -- freshly created or DR-115's idempotent return.</summary>
+    Submitted,
+
+    /// <summary>The last attempt did not produce an entry, as far as the client can tell. Retryable.</summary>
+    Failed,
+
+    /// <summary>Terminal. The player skipped, or played again, without submitting. Nothing was sent.</summary>
+    Declined
+}
+
+/// <summary>
+/// docs/specs/009-submit-score.md §5.4: why one submission attempt failed. Closed set. The server
+/// never reports <see cref="AlreadySubmitted"/> -- that guard is client-only (§5.4 note).
+/// </summary>
+public enum SubmissionFailureReason
+{
+    /// <summary>Empty or whitespace-only after normalisation (DR-109).</summary>
+    NameMissing,
+
+    /// <summary>More than 20 grapheme clusters after normalisation (DR-111).</summary>
+    NameTooLong,
+
+    /// <summary>A control or format character survived normalisation (DR-111).</summary>
+    NameHasForbiddenCharacters,
+
+    /// <summary>The figures failed DR-123's sanity validation. Server only.</summary>
+    FiguresRejected,
+
+    /// <summary>No CompletedRun is available -- the window closed (DR-106). Client only.</summary>
+    RunUnavailable,
+
+    /// <summary>This run is already Submitted; the client refuses to send again. Client only (FR-022).</summary>
+    AlreadySubmitted,
+
+    /// <summary>The request could not be sent or no response arrived. Client only.</summary>
+    NetworkUnavailable,
+
+    /// <summary>The DR-128 deadline of 10 seconds elapsed with no response. Client only.</summary>
+    Timeout,
+
+    /// <summary>The server answered, but with a failure it does not attribute to the submission.</summary>
+    ServerError
+}

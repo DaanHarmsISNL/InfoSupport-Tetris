@@ -11,6 +11,12 @@ builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
 builder.Services.AddSingleton<IGameSessionStore, GameSessionStore>();
 
+// docs/specs/009-submit-score.md DR-115/DR-121/DR-122: one shared leaderboard, global to the
+// application. In-memory for now -- durability across a redeploy (FR-023) is deferred to an ADR
+// (arc42 §09, open question 1); nothing above this interface changes when that is resolved.
+builder.Services.AddSingleton<IScoreSubmissionService, ScoreSubmissionService>();
+builder.Services.AddSingleton<ILeaderboardStore, LeaderboardStore>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -16,10 +16,12 @@ namespace infosupport_tetris.Pages;
 public class IndexModel : PageModel
 {
     private readonly IGameSessionStore _store;
+    private readonly IScoreSubmissionService _scoreSubmissionService;
 
-    public IndexModel(IGameSessionStore store)
+    public IndexModel(IGameSessionStore store, IScoreSubmissionService scoreSubmissionService)
     {
         _store = store;
+        _scoreSubmissionService = scoreSubmissionService;
     }
 
     public GameSession? Session { get; private set; }
@@ -235,6 +237,27 @@ public class IndexModel : PageModel
         }
 
         return new NoContentResult();
+    }
+
+    /// <summary>docs/specs/009-submit-score.md: the exact payload NFR-007 allows -- runId, name and the three figures, nothing else.</summary>
+    public sealed record SubmitScoreRequest(Guid RunId, string? PlayerName, long Score, int LinesCleared, int Level);
+
+    public sealed record SubmitScoreResponse(bool Success, Guid? EntryId, string? PlayerName, string? FailureReason, string? FailureMessage);
+
+    /// <summary>
+    /// FR-007/FR-008/FR-021/FR-026/FR-027: validates and stores a submission, or returns the
+    /// existing entry for an already-submitted runId (DR-115). <see cref="RedirectToPage"/> is not
+    /// used here -- the game-over screen is never reloaded by a submission (FR-014), so this
+    /// returns JSON for the page's own fetch-based submit flow to interpret.
+    /// </summary>
+    public IActionResult OnPostSubmitScore([FromBody] SubmitScoreRequest request)
+    {
+        var result = _scoreSubmissionService.Submit(
+            request.RunId, request.PlayerName, request.Score, request.LinesCleared, request.Level, DateTimeOffset.UtcNow);
+
+        return new JsonResult(new SubmitScoreResponse(
+            result.Success, result.EntryId, result.StoredPlayerName,
+            result.FailureReason?.ToString(), result.FailureMessage));
     }
 
     private string SessionId => HttpContext.Session.Id;
