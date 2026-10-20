@@ -80,6 +80,75 @@
         <form method="post" asp-page-handler="NewGame" class="mt-3">
             <button type="submit" class="btn btn-secondary">New game</button>
         </form>
+
+        @* Spec 002 §5.3 KeyBinding/DR-29/DR-42: client-side key capture. The server (GameSession)
+           is the sole authority on whether an action is legal (DR-28, DR-30, DR-35); this script
+           only translates DOM key events into InputCommand posts and suppresses the browser's
+           default action for bound keys while playing. Per DR-31/DR-32 it sends press/release
+           events only — DAS/ARR repeat *timing* is InputState/GameSession's job (see
+           GameSession.Tick), driven forward by the page's own auto-refresh. *@
+        @if (Model.Session.Status == GameStatus.Playing)
+        {
+            <script>
+                (function () {
+                    const bindings = {
+                        ArrowLeft: 'MoveLeft',
+                        ArrowRight: 'MoveRight',
+                        ArrowDown: 'SoftDropStart',
+                        ArrowUp: 'RotateClockwise',
+                        KeyX: 'RotateClockwise',
+                        KeyZ: 'RotateCounterClockwise',
+                        ControlLeft: 'RotateCounterClockwise',
+                        ControlRight: 'RotateCounterClockwise'
+                    };
+
+                    const held = new Set();
+
+                    function post(handler, command) {
+                        fetch('?handler=' + handler + '&command=' + command, { method: 'POST' });
+                    }
+
+                    document.addEventListener('keydown', function (e) {
+                        const command = bindings[e.code];
+                        if (!command) {
+                            return;
+                        }
+
+                        e.preventDefault(); // DR-42: never scroll/page-down on a bound key.
+
+                        if (e.repeat) {
+                            return; // DR-31/DR-34: OS key-repeat is ignored; the game times its own.
+                        }
+
+                        held.add(e.code);
+                        post('Input', command);
+                    });
+
+                    document.addEventListener('keyup', function (e) {
+                        const command = bindings[e.code];
+                        if (!command) {
+                            return;
+                        }
+
+                        held.delete(e.code);
+
+                        if (command === 'MoveLeft' || command === 'MoveRight') {
+                            post('Release', command);
+                        } else if (command === 'SoftDropStart') {
+                            post('Release', 'SoftDropEnd');
+                        }
+                    });
+
+                    // EC-7/EC-8: losing focus releases everything, so nothing auto-repeats forever.
+                    window.addEventListener('blur', function () {
+                        if (held.has('ArrowLeft')) { post('Release', 'MoveLeft'); }
+                        if (held.has('ArrowRight')) { post('Release', 'MoveRight'); }
+                        if (held.has('ArrowDown')) { post('Release', 'SoftDropEnd'); }
+                        held.clear();
+                    });
+                })();
+            </script>
+        }
     }
 </div>
 
