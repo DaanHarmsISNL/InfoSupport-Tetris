@@ -54,6 +54,9 @@ public sealed class GameSession
     /// </summary>
     public static readonly TimeSpan MaxElapsedPerTick = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>DR-16: a grounded piece locks after 0.500 second of continuous grounded time.</summary>
+    public static readonly TimeSpan LockDelay = TimeSpan.FromMilliseconds(500);
+
     public GameSession(int? pieceQueueSeed = null)
     {
         PieceQueue = new PieceQueue(pieceQueueSeed);
@@ -122,9 +125,10 @@ public sealed class GameSession
 
         if (!Playfield.IsValidPlacement(piece.OccupiedCells))
         {
-            // DR-21 block out: spawn cells already occupied. Not placed; story 004 detects this
-            // (ActivePiece stays null) and transitions the session to GameOver.
+            // DR-21/FR-021/SC-023 block out: spawn cells already occupied. The piece is not
+            // placed (ActivePiece stays null) and the session ends.
             PiecesSpawned++;
+            Status = GameStatus.GameOver;
             return;
         }
 
@@ -163,7 +167,12 @@ public sealed class GameSession
     /// </summary>
     public void Tick(TimeSpan elapsed)
     {
-        if (Status != GameStatus.Playing || ActivePiece is null)
+        if (Status != GameStatus.Playing) // DR-27: terminal status, nothing more happens.
+        {
+            return;
+        }
+
+        if (ActivePiece is null)
         {
             return;
         }
@@ -177,12 +186,25 @@ public sealed class GameSession
         var clamped = elapsed > MaxElapsedPerTick ? MaxElapsedPerTick : elapsed; // DR-26/EC-2
         var piece = ActivePiece;
 
+        UpdateLowestRowReached(piece); // DR-17: baseline before this tick's movement.
+
         if (piece.IsGrounded(Playfield))
         {
-            // FR-016 (US-004's concern): gravity stops acting on a grounded piece. No lock
-            // delay is started here — that is story 004.
+            // FR-016/DR-16: gravity stops acting on a grounded piece; a 0.500s lock delay
+            // accumulates instead.
+            piece.LockTimerElapsed = (piece.LockTimerElapsed ?? TimeSpan.Zero) + clamped;
+
+            if (piece.LockTimerElapsed >= LockDelay)
+            {
+                LockActivePiece(piece); // DR-19, then DR-20/DR-22.
+            }
+
             return;
         }
+
+        // DR-18: the piece is not (or no longer) grounded. Cancel any running lock delay —
+        // without refunding the reset budget — and resume gravity.
+        piece.LockTimerElapsed = null;
 
         piece.FallTimerElapsed += clamped;
 
@@ -211,6 +233,49 @@ public sealed class GameSession
 
             piece.Position = steppedPosition;
             piece.FallTimerElapsed -= GravityInterval;
+            UpdateLowestRowReached(piece); // DR-17: replenish budget on a new lowest row.
         }
+    }
+
+    /// <summary>
+    /// DR-17: whenever the piece occupies a row lower (larger index) than any it has previously
+    /// occupied, its lock reset budget is replenished to <see cref="ActivePiece.MaxLockResets"/>.
+    /// </summary>
+    private static void UpdateLowestRowReached(ActivePiece piece)
+    {
+        var maxRow = piece.OccupiedCells.Max(c => c.Row);
+        if (maxRow > piece.LowestRowReached)
+        {
+            piece.LowestRowReached = maxRow;
+            piece.LockResetsUsed = 0;
+        }
+    }
+
+    /// <summary>
+    /// DR-19: locks <paramref name="piece"/> by writing its four occupied cells into the
+    /// playfield as occupied cells of its type, atomically, and clearing <see cref="ActivePiece"/>.
+    /// Then resolves DR-22 (lock out) or DR-20 (immediate next spawn).
+    /// </summary>
+    private void LockActivePiece(ActivePiece piece)
+    {
+        var cells = piece.OccupiedCells.ToArray();
+
+        foreach (var cell in cells)
+        {
+            Playfield.GetCell(cell.Row, cell.Column).Occupant = piece.Type;
+        }
+
+        ActivePiece = null;
+
+        // DR-22/FR-022/SC-024 lock out: all four cells still in buffer rows (row <= 19).
+        if (cells.All(c => c.Row <= 19))
+        {
+            Status = GameStatus.GameOver;
+            return;
+        }
+
+        // DR-20/FR-020/SC-022: the next piece spawns immediately, no entry delay. Spawn() itself
+        // detects DR-21 block out and sets GameStatus.GameOver if the new spawn is blocked.
+        Spawn();
     }
 }

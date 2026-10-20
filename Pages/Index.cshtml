@@ -31,6 +31,13 @@
             Score: @Model.Session.Score
         </p>
 
+        @* US-004/DR-21/DR-22: minimal acknowledgement that the session ended (block out or lock
+           out). The GameOver presentation itself (final score, etc.) is story 008's concern. *@
+        @if (Model.Session.Status == GameStatus.GameOver)
+        {
+            <p><strong>Game Over</strong></p>
+        }
+
         @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
            rows above them are never rendered, so a piece occupying only buffer rows is invisible.
            US-002: the active piece's cells are colour-coded by TetrominoType (DR-24) via

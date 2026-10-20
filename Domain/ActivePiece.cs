@@ -13,6 +13,9 @@ namespace infosupport_tetris.Domain;
 /// </summary>
 public sealed class ActivePiece
 {
+    /// <summary>DR-17: the per-piece lock delay reset budget.</summary>
+    public const int MaxLockResets = 15;
+
     public required TetrominoType Type { get; init; }
 
     public Orientation Orientation { get; set; } = Orientation.Spawn;
@@ -26,14 +29,47 @@ public sealed class ActivePiece
     /// </summary>
     public TimeSpan FallTimerElapsed { get; set; } = TimeSpan.Zero;
 
-    /// <summary>Placeholder for story 004's lock delay timer. Not advanced by this spec.</summary>
+    /// <summary>
+    /// DR-16: time accumulated toward locking while the piece is grounded. Null while the piece
+    /// is not grounded (no lock delay running); set to <see cref="TimeSpan.Zero"/> when a lock
+    /// delay starts and advanced by <see cref="GameSession.Tick"/>.
+    /// </summary>
     public TimeSpan? LockTimerElapsed { get; set; }
 
-    /// <summary>Placeholder for story 004's lock delay reset budget (DR-17).</summary>
+    /// <summary>DR-17: resets consumed from the budget of <see cref="MaxLockResets"/>.</summary>
     public int LockResetsUsed { get; set; }
 
-    /// <summary>Placeholder for story 004's budget-replenishment tracking (DR-17).</summary>
+    /// <summary>
+    /// DR-17: the lowest (largest) row index any of this piece's cells has occupied so far.
+    /// Drives budget replenishment — whenever the piece reaches a new lowest row, the budget
+    /// is replenished to <see cref="MaxLockResets"/> (<see cref="GameSession"/> updates this).
+    /// </summary>
     public int LowestRowReached { get; set; }
+
+    /// <summary>
+    /// Story 002's extension point: requests a lock delay reset (e.g. after a successful move
+    /// or rotation). Per DR-17, granted only while the piece is grounded (a lock delay is
+    /// running) and the 15-reset budget is not exhausted; otherwise ignored. Returns whether a
+    /// reset was granted. This spec (US-004) never calls this itself — nothing here moves or
+    /// rotates the piece — but exposes it so story 002 can plug in without GameSession/ActivePiece
+    /// changes.
+    /// </summary>
+    public bool TryResetLockTimer()
+    {
+        if (LockTimerElapsed is null)
+        {
+            return false;
+        }
+
+        if (LockResetsUsed >= MaxLockResets)
+        {
+            return false;
+        }
+
+        LockResetsUsed++;
+        LockTimerElapsed = TimeSpan.Zero;
+        return true;
+    }
 
     /// <summary>
     /// Derived, never stored: the four <see cref="CellPosition"/>s obtained by applying the
