@@ -25,6 +25,14 @@ public sealed class GameSession
 
     public PieceQueue PieceQueue { get; }
 
+    /// <summary>
+    /// docs/specs/004-next-piece-preview.md: a derived, read-only projection of
+    /// <see cref="PieceQueue"/>`.Upcoming[0]` (DR-52/DR-53). Recomputed on every access — never
+    /// cached — so it always reflects the current <see cref="Status"/> and queue state (DR-54,
+    /// EC-11).
+    /// </summary>
+    public NextPiecePreview NextPiecePreview => NextPiecePreview.For(this);
+
     public int Level { get; private set; } = 1;
 
     public int Score { get; private set; }

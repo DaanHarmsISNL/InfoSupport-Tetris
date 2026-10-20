@@ -8,12 +8,20 @@
 <div class="text-center">
     <h1 class="display-4">Tetris</h1>
 
+    @{
+        // docs/specs/004-next-piece-preview.md: the preview panel is rendered in every branch
+        // below (Ready, Playing, GameOver) with the same markup, so DR-57's fixed area never
+        // resizes or moves as Status changes.
+        var preview = Model.Preview;
+    }
     @if (Model.Session is null || Model.Session.Status == GameStatus.Ready)
     {
         <p>Take five. One click, no sign-up.</p>
         <form method="post" asp-page-handler="Start">
             <button type="submit" class="btn btn-primary btn-lg">Start game</button>
         </form>
+
+        @await Html.PartialAsync("_NextPiecePreview", preview)
     }
     else
     {
@@ -42,25 +50,31 @@
            rows above them are never rendered, so a piece occupying only buffer rows is invisible.
            US-002: the active piece's cells are colour-coded by TetrominoType (DR-24) via
            Model.ActivePieceVisibleCells, which already excludes buffer-row cells. *@
-        <div class="tetris-playfield" role="img" aria-label="Tetris playfield">
-            @for (var visibleRow = 0; visibleRow < Playfield.VisibleRowCount; visibleRow++)
-            {
-                <div class="tetris-row">
-                    @for (var column = 0; column < Playfield.ColumnCount; column++)
-                    {
-                        var cell = Model.Session.Playfield.GetVisibleCell(visibleRow, column);
-                        if (Model.ActivePieceVisibleCells.TryGetValue((visibleRow, column), out var activeColour))
+        <div class="tetris-layout">
+            <div class="tetris-playfield" role="img" aria-label="Tetris playfield">
+                @for (var visibleRow = 0; visibleRow < Playfield.VisibleRowCount; visibleRow++)
+                {
+                    <div class="tetris-row">
+                        @for (var column = 0; column < Playfield.ColumnCount; column++)
                         {
-                            <div class="tetris-cell occupied active-piece" style="background-color:@activeColour;"></div>
+                            var cell = Model.Session.Playfield.GetVisibleCell(visibleRow, column);
+                            if (Model.ActivePieceVisibleCells.TryGetValue((visibleRow, column), out var activeColour))
+                            {
+                                <div class="tetris-cell occupied active-piece" style="background-color:@activeColour;"></div>
+                            }
+                            else
+                            {
+                                var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
+                                <div class="@cssClass"></div>
+                            }
                         }
-                        else
-                        {
-                            var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
-                            <div class="@cssClass"></div>
-                        }
-                    }
-                </div>
-            }
+                    </div>
+                }
+            </div>
+
+            <div class="tetris-side-panel">
+                @await Html.PartialAsync("_NextPiecePreview", preview)
+            </div>
         </div>
 
         <form method="post" asp-page-handler="NewGame" class="mt-3">
@@ -70,6 +84,12 @@
 </div>
 
 <style>
+    .tetris-layout {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
     .tetris-playfield {
         display: inline-block;
         border: 2px solid #333;
@@ -90,5 +110,36 @@
 
     .tetris-cell.occupied {
         background: #888;
+    }
+
+    /* docs/specs/004-next-piece-preview.md DR-57/NFR-003: the side panel and the preview grid
+       within it are a fixed size regardless of Status or the previewed type, so neither the
+       panel nor the playfield shifts as the preview changes or empties. */
+    .tetris-side-panel {
+        width: 140px;
+        text-align: left;
+    }
+
+    .tetris-preview-caption {
+        font-weight: bold;
+        margin-bottom: 4px;
+    }
+
+    .tetris-preview-grid {
+        position: relative;
+        /* NFR-002: preview cells are >= 60% of the 24px playfield cell (here: the full 24px). */
+        width: calc(4 * 24px);
+        height: calc(2 * 24px);
+        border: 2px solid #333;
+        background: #111;
+        box-sizing: border-box;
+    }
+
+    .tetris-preview-cell {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        box-sizing: border-box;
+        border: 1px solid #222;
     }
 </style>

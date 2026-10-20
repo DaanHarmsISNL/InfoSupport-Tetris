@@ -1,0 +1,20 @@
+@model infosupport_tetris.Domain.NextPiecePreview
+
+@*
+    docs/specs/004-next-piece-preview.md: renders the derived, read-only NextPiecePreview.
+    FR-004/DR-57: the grid is always 4x2, sized identically whether populated or empty.
+    FR-005/DR-58: cells are pre-centred by NextPiecePreview.For, so this view only positions
+    them at the given (Column, Row) offsets.
+    FR-013/FR-014/DR-59: caption is always shown; AccessibleName is exposed via aria-label so
+    the piece is identifiable without colour or shape (not as a live region — NFR-005).
+    DR-61: this markup contains no form, button or script — purely decorative/informational,
+    so it cannot alter GameSession state.
+*@
+<div class="tetris-preview-caption">@Model.Caption</div>
+<div class="tetris-preview-grid" role="img" aria-label="@Model.AccessibleName">
+    @foreach (var cell in Model.Cells)
+    {
+        <div class="tetris-preview-cell"
+             style="left:calc(@(cell.Column) * 24px); top:calc(@(cell.Row) * 24px); background-color:@Model.Colour;"></div>
+    }
+</div>

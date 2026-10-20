@@ -50,12 +50,28 @@ public class IndexModel : PageModel
         }
     }
 
+    /// <summary>
+    /// docs/specs/004-next-piece-preview.md FR-006/SC-002: the preview must already show the
+    /// first upcoming type before the player ever presses Start, so a Ready GameSession is
+    /// constructed and stored on first visit rather than only on OnPostStart. This adds no new
+    /// state beyond what 001 already models (a Ready session with no active piece).
+    /// </summary>
+    public NextPiecePreview Preview => Session?.NextPiecePreview
+        ?? NextPiecePreview.For(new GameSession());
+
     public void OnGet()
     {
         // Touch the session so the cookie is established even on a first-ever visit, otherwise
         // HttpContext.Session.Id would not be stable across the subsequent POST/redirect.
         HttpContext.Session.SetString("touched", "1");
         Session = _store.Get(SessionId);
+
+        if (Session is null)
+        {
+            // FR-006: a Ready session must exist before Start is pressed so its preview can be
+            // read (EC-1). No gameplay starts here — Status stays Ready until OnPostStart.
+            Session = _store.Replace(SessionId, new GameSession());
+        }
 
         // US-003 (DR-14/DR-26): minimal game-loop wiring. There is no JS framework yet, so the
         // page auto-refreshes (see the meta-refresh tag in Index.cshtml) and each GET drives
