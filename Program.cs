@@ -41,3 +41,8 @@ app.MapRazorPages()
    .WithStaticAssets();
 
 app.Run();
+
+// Exposed so Microsoft.AspNetCore.Mvc.Testing's WebApplicationFactory<Program> (see
+// tests/infosupport-tetris.Tests/LandingPageTests.cs) can boot this app in-process; top-level
+// statements otherwise generate an internal Program class that the test project cannot see.
+public partial class Program { }
