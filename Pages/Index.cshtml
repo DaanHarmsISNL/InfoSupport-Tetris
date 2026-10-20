@@ -1,10 +1,70 @@
-﻿@page
+@page
 @model IndexModel
+@using infosupport_tetris.Domain
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Tetris";
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">Tetris</h1>
+
+    @if (Model.Session is null || Model.Session.Status == GameStatus.Ready)
+    {
+        <p>Take five. One click, no sign-up.</p>
+        <form method="post" asp-page-handler="Start">
+            <button type="submit" class="btn btn-primary btn-lg">Start game</button>
+        </form>
+    }
+    else
+    {
+        <p>
+            Status: @Model.Session.Status &nbsp;|&nbsp;
+            Level: @Model.Session.Level &nbsp;|&nbsp;
+            Score: @Model.Session.Score
+        </p>
+
+        @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
+           rows above them are never rendered, so a piece occupying only buffer rows is invisible. *@
+        <div class="tetris-playfield" role="img" aria-label="Tetris playfield">
+            @for (var visibleRow = 0; visibleRow < Playfield.VisibleRowCount; visibleRow++)
+            {
+                <div class="tetris-row">
+                    @for (var column = 0; column < Playfield.ColumnCount; column++)
+                    {
+                        var cell = Model.Session.Playfield.GetVisibleCell(visibleRow, column);
+                        var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
+                        <div class="@cssClass"></div>
+                    }
+                </div>
+            }
+        </div>
+
+        <form method="post" asp-page-handler="NewGame" class="mt-3">
+            <button type="submit" class="btn btn-secondary">New game</button>
+        </form>
+    }
 </div>
+
+<style>
+    .tetris-playfield {
+        display: inline-block;
+        border: 2px solid #333;
+        background: #111;
+    }
+
+    .tetris-row {
+        display: flex;
+    }
+
+    .tetris-cell {
+        width: 24px;
+        height: 24px;
+        box-sizing: border-box;
+        border: 1px solid #222;
+        background: #111;
+    }
+
+    .tetris-cell.occupied {
+        background: #888;
+    }
+</style>
