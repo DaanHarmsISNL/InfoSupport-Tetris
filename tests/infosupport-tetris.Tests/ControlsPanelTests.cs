@@ -208,7 +208,7 @@ public class ControlsPanelTests
             ["Ctrl"] = "Control",
             ["C"] = "KeyC",
             ["Shift"] = "Shift",
-            ["Space"] = "hard-drop-form", // Space is handled by the dedicated hard-drop script/form, not `bindings`.
+            ["Space"] = "handler=HardDrop", // Space is handled by the dedicated hard-drop script, not `bindings`.
         };
 
         foreach (var entry in ControlLegend.Entries)

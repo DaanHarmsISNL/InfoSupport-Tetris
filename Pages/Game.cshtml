@@ -36,21 +36,6 @@
     }
     else
     {
-        @* US-003 (DR-14/DR-26): no JS framework exists yet, so gravity is driven server-side by
-           having the page auto-refresh; each GET recomputes GameSession.Tick from the real
-           elapsed wall-clock time (see IndexModel.OnGet). Simple and sufficient to make gravity
-           visible; the spec-tested logic lives entirely in GameSession.Tick, not here. *@
-        @if (Model.Session.Status == GameStatus.Playing)
-        {
-            <meta http-equiv="refresh" content="0.25">
-        }
-        <p>
-            Status: @Model.Session.Status &nbsp;|&nbsp;
-            Level: @Model.Session.Level &nbsp;|&nbsp;
-            Score: @Model.Session.Score &nbsp;|&nbsp;
-            Lines: @Model.Session.LinesCleared
-        </p>
-
         @* docs/specs/008-game-over.md FR-004/FR-005/FR-007 (US-001/US-002/US-003): an unmistakable,
            immediate game-over indication together with the frozen final summary -- score, lines
            cleared, level and pieces spawned, exactly as frozen (DR-104) -- and the reason the run
@@ -60,10 +45,10 @@
             <div role="alert" aria-live="assertive" class="tetris-game-over">
                 <p><strong>Game Over</strong> &mdash; @(run.TopOutReason == TopOutReason.BlockOut ? "no room left to spawn" : "locked out above the field")</p>
                 <p>
-                    Final score: @run.FinalScore &nbsp;|&nbsp;
-                    Lines cleared: @run.LinesCleared &nbsp;|&nbsp;
-                    Level reached: @run.FinalLevel &nbsp;|&nbsp;
-                    Pieces spawned: @run.PiecesSpawned
+                    Final score: <span class="numeric">@run.FinalScore</span> &nbsp;|&nbsp;
+                    Lines cleared: <span class="numeric">@run.LinesCleared</span> &nbsp;|&nbsp;
+                    Level reached: <span class="numeric">@run.FinalLevel</span> &nbsp;|&nbsp;
+                    Pieces spawned: <span class="numeric">@run.PiecesSpawned</span>
                 </p>
             </div>
 
@@ -91,44 +76,12 @@
             <p><a id="view-leaderboard-link" asp-page="/Leaderboard">View leaderboard</a></p>
         }
 
-        @* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
-           rows above them are never rendered, so a piece occupying only buffer rows is invisible.
-           US-002: the active piece's cells are colour-coded by TetrominoType (DR-24) via
-           Model.ActivePieceVisibleCells, which already excludes buffer-row cells. *@
-        <div class="tetris-layout">
-            <div class="tetris-playfield" role="img" aria-label="Tetris playfield">
-                @for (var visibleRow = 0; visibleRow < Playfield.VisibleRowCount; visibleRow++)
-                {
-                    <div class="tetris-row">
-                        @for (var column = 0; column < Playfield.ColumnCount; column++)
-                        {
-                            var cell = Model.Session.Playfield.GetVisibleCell(visibleRow, column);
-                            if (Model.ActivePieceVisibleCells.TryGetValue((visibleRow, column), out var activeColour))
-                            {
-                                <div class="tetris-cell occupied active-piece" style="background-color:@activeColour;"></div>
-                            }
-                            else
-                            {
-                                var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
-                                <div class="@cssClass"></div>
-                            }
-                        }
-                    </div>
-                }
-            </div>
-
-            <div class="tetris-side-panel">
-                @await Html.PartialAsync("_HoldDisplay", Model.Hold)
-                @await Html.PartialAsync("_NextPiecePreview", preview)
-
-                @* docs/specs/014-controls-panel.md DR-266/FR-009: permanent, fully visible beside
-                   the board throughout Playing; DR-268: non-focusable collapse control while
-                   Playing, via IsPlaying below. *@
-                <div id="controls">
-                    @await Html.PartialAsync("_ControlsPanel", ControlsPanelViewModel.For(isPlaying: Model.Session.Status == GameStatus.Playing))
-                </div>
-            </div>
-        </div>
+        @* US-003 (DR-14/DR-26): gravity is driven server-side -- every request recomputes
+           GameSession.Tick from real elapsed wall-clock time (see GameModel.OnGet). The readouts,
+           playfield, hold and preview all live in _GameBoard, which is what the live-update loop
+           at the bottom of this page re-fetches and patches into place; the spec-tested logic
+           stays entirely in GameSession.Tick, not here. *@
+        @await Html.PartialAsync("_GameBoard", Model)
 
         @* docs/specs/008-game-over.md FR-011/FR-018: "play again" is the same action as 001
            FR-005's "New game" (DR-105/DR-23), surfaced here with its game-over label. FR-012/FR-013:
@@ -283,13 +236,107 @@
             </script>
         }
 
-        @* Spec 003 (hard drop): Space is bound to this form alone (DR-49). There is no JS
-           framework in this project, so the gravity/lock loop is driven by the meta-refresh above
-           and hard drop is driven by this dedicated POST, submitted by the edge-triggered keydown
-           listener below rather than by the player clicking a button. *@
+        @* The live-update loop. This replaces the <meta http-equiv="refresh" content="0.25">
+           that used to drive the game: a full-document reload four times a second repainted the
+           entire page (visible flicker) and tore down the JS context mid-keystroke, so held keys,
+           key-ups and in-flight input POSTs were regularly lost — the game felt unresponsive.
+
+           Instead the loop re-fetches _GameBoard and swaps only the fragments that change, and
+           every input POST returns the freshly ticked board itself, so a keypress is reflected as
+           soon as the server has applied it rather than at the next whole-page reload. The DOM
+           around it (and therefore every listener, `held`, `armed`, focus and the controls panel's
+           collapse state) survives for the whole run. *@
         @if (Model.Session.Status == GameStatus.Playing)
         {
-            <form method="post" asp-page-handler="HardDrop" id="hard-drop-form" class="d-none"></form>
+            <script>
+                (function () {
+                    // Deliberately under GameSession.MaxElapsedPerTick (DR-26/EC-2: 100ms), which
+                    // caps how much elapsed time a single Tick may consume. Polling slower than
+                    // that cap silently *throws real time away* -- the old 250ms refresh handed
+                    // the server 250ms and had 100ms of it honoured, which is why the game also
+                    // crawled at roughly 40% of its intended speed. At 80ms, request latency
+                    // included, gravity and DAS run at the speed the level curve specifies.
+                    const POLL_INTERVAL_MS = 80;
+
+                    // The fragments of _GameBoard that are safe to replace wholesale: no scripts,
+                    // no focusable elements, no player-owned state. #controls is deliberately not
+                    // in this list -- see the comment in _GameBoard.cshtml.
+                    const LIVE_FRAGMENT_IDS = ['game-stats', 'game-playfield-host', 'game-hold-host', 'game-preview-host'];
+
+                    const scratch = document.createElement('div');
+                    let newestApplied = 0;
+                    let stopped = false;
+
+                    function apply(html, requestedAt) {
+                        // Input POSTs and the poll race each other; only ever move forward, never
+                        // repaint an older board over a newer one.
+                        if (stopped || !html || requestedAt < newestApplied) {
+                            return;
+                        }
+                        newestApplied = requestedAt;
+
+                        scratch.innerHTML = html;
+                        const stats = scratch.querySelector('#game-stats');
+                        if (!stats) {
+                            return; // not a board response (e.g. a 204 from a release post)
+                        }
+
+                        for (const id of LIVE_FRAGMENT_IDS) {
+                            const incoming = scratch.querySelector('#' + id);
+                            const live = document.getElementById(id);
+                            if (incoming && live) {
+                                live.innerHTML = incoming.innerHTML;
+                            }
+                        }
+
+                        if (stats.dataset.status !== 'Playing') {
+                            // The run ended server-side. Game over brings in markup this loop must
+                            // not fake (the submission form and its scripts), so hand over to a
+                            // single real page load -- the only one in a whole run.
+                            stopped = true;
+                            window.location.reload();
+                        }
+                    }
+
+                    function request(url, options) {
+                        const requestedAt = performance.now();
+                        return fetch(url, options)
+                            .then(function (response) {
+                                if (response.status === 404) {
+                                    // The server no longer has this session (it expired, or the
+                                    // app restarted). Polling can never recover from that; a real
+                                    // load puts the player back on a page that matches reality.
+                                    stopped = true;
+                                    window.location.reload();
+                                    return null;
+                                }
+                                return response.ok ? response.text() : null;
+                            })
+                            .then(function (html) { apply(html, requestedAt); })
+                            .catch(function () { /* a dropped frame is not worth surfacing; the next poll recovers */ });
+                    }
+
+                    function poll() {
+                        if (stopped) {
+                            return;
+                        }
+                        // Chained rather than setInterval: a slow response delays the next poll
+                        // instead of stacking requests on top of it.
+                        request('?handler=Board').then(function () {
+                            if (!stopped) {
+                                window.setTimeout(poll, POLL_INTERVAL_MS);
+                            }
+                        });
+                    }
+
+                    // Shared with the key handlers below (and the hard-drop script in @@section Scripts).
+                    window.tetrisGame = {
+                        send: function (query) { return request(query, { method: 'POST' }); }
+                    };
+
+                    window.setTimeout(poll, POLL_INTERVAL_MS);
+                })();
+            </script>
         }
 
         @* Spec 002 §5.3 KeyBinding/DR-29/DR-42: client-side key capture. The server (GameSession)
@@ -297,7 +344,7 @@
            only translates DOM key events into InputCommand posts and suppresses the browser's
            default action for bound keys while playing. Per DR-31/DR-32 it sends press/release
            events only — DAS/ARR repeat *timing* is InputState/GameSession's job (see
-           GameSession.Tick), driven forward by the page's own auto-refresh. *@
+           GameSession.Tick), driven forward by the live-update loop above. *@
         @if (Model.Session.Status == GameStatus.Playing)
         {
             <script>
@@ -325,7 +372,11 @@
                     const held = new Set();
 
                     function post(handler, command) {
-                        fetch('?handler=' + handler + '&command=' + command, { method: 'POST' });
+                        // The handler ticks gravity, applies the command and renders the board
+                        // back (DR-29/DR-30 still hold: the server decides what the command does,
+                        // this only reports the keypress), so the press shows up as soon as it
+                        // has been applied instead of waiting for the next poll.
+                        window.tetrisGame.send('?handler=' + handler + '&command=' + command);
                     }
 
                     document.addEventListener('keydown', function (e) {
@@ -379,11 +430,10 @@
             // Spec 003 -- DR-47 (edge trigger) / DR-49 (Space only) / DR-51 (arming scope).
             // `armed` tracks the physical key for the lifetime of this page load: cleared on
             // key-down, set again only by key-up or by the window losing focus (treated as a
-            // key-up per DR-51/FR-011). Every tick of the game loop (gravity, lock, spawn,
-            // hard drop itself) reloads this page via the meta-refresh or a form POST, which
-            // reinitialises `armed = true` on a fresh script context -- so a key held across a
-            // lock/spawn/game-over boundary never produces a second hard drop (DR-51), because no
-            // new keydown event is dispatched for a key that never went up.
+            // key-up per DR-51/FR-011). The page is no longer reloaded per tick, so this state
+            // now genuinely spans the whole run -- which is what DR-51 asks for: a key held
+            // across a lock/spawn/game-over boundary stays disarmed until it is physically
+            // released, and so can never produce a second hard drop.
             (function () {
                 var armed = true;
 
@@ -410,9 +460,11 @@
                     armed = false;
                     event.preventDefault();
 
-                    var form = document.getElementById('hard-drop-form');
-                    if (form) {
-                        form.submit();
+                    // DR-49: Space alone triggers this. Posted like every other input rather than
+                    // submitted as a form -- a form POST navigated the whole document away, which
+                    // is what made a hard drop blank and redraw the page.
+                    if (window.tetrisGame) {
+                        window.tetrisGame.send('?handler=HardDrop');
                     }
                 });
 

@@ -81,21 +81,52 @@ public class GameModel : PageModel
             Session = _store.Replace(SessionId, new GameSession());
         }
 
-        // US-003 (DR-14/DR-26): minimal game-loop wiring. There is no JS framework yet, so the
-        // page auto-refreshes (see the meta-refresh tag in Index.cshtml) and each GET drives
-        // gravity from the real wall-clock time elapsed since the previous tick. This keeps the
-        // spec-tested logic entirely in GameSession.Tick, which is exercised deterministically
-        // by the test suite via simulated deltas rather than real elapsed time.
-        if (Session is { Status: GameStatus.Playing })
-        {
-            var now = DateTimeOffset.UtcNow;
-            if (Session.LastTickAt is { } lastTick)
-            {
-                Session.Tick(now - lastTick);
-            }
+        // US-003 (DR-14/DR-26): minimal game-loop wiring. There is no JS framework yet, so every
+        // request drives gravity from the real wall-clock time elapsed since the previous tick,
+        // and the browser polls for the result (see the live-update loop in Game.cshtml). This
+        // keeps the spec-tested logic entirely in GameSession.Tick, which is exercised
+        // deterministically by the test suite via simulated deltas rather than real elapsed time.
+        TickToNow(Session);
+    }
 
-            Session.LastTickAt = now;
+    /// <summary>
+    /// The browser's live-update poll: ticks gravity exactly as <see cref="OnGet"/> does and
+    /// returns just the board fragments, so the page can be updated in place instead of being
+    /// reloaded wholesale. Rendering the same partial the page itself uses keeps Razor the
+    /// single source of truth for the board markup.
+    /// </summary>
+    public IActionResult OnGetBoard()
+    {
+        HttpContext.Session.SetString("touched", "1");
+        var session = _store.Get(SessionId);
+        if (session is null)
+        {
+            return NotFound();
         }
+
+        TickToNow(session);
+        Session = session;
+        return Partial("_GameBoard", this);
+    }
+
+    /// <summary>
+    /// Advances gravity, soft drop and lock delay to "now" from the real time elapsed since the
+    /// previous tick. A no-op unless the session is actually playing.
+    /// </summary>
+    private static void TickToNow(GameSession? session)
+    {
+        if (session is not { Status: GameStatus.Playing })
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (session.LastTickAt is { } lastTick)
+        {
+            session.Tick(now - lastTick);
+        }
+
+        session.LastTickAt = now;
     }
 
     /// <summary>FR-001: single action, no data entry, Ready -&gt; Playing.</summary>
@@ -119,40 +150,39 @@ public class GameModel : PageModel
     }
 
     /// <summary>
-    /// Spec 003: hard drop (FR-001..FR-013). The page has no JS framework, so gravity/lock delay
-    /// are driven by auto-refresh (see <see cref="OnGet"/>) and this handler is invoked by a
-    /// dedicated form the page's edge-triggered keydown script submits on `Space` (DR-49, DR-47).
+    /// Spec 003: hard drop (FR-001..FR-013). The page has no JS framework, so this handler is
+    /// posted to by the page's edge-triggered keydown script on `Space` (DR-49, DR-47).
     /// Catches up gravity/lock-delay time elapsed since the last tick first, exactly as <see cref="OnGet"/>
     /// does, so a hard drop reflects the same state the player is currently looking at. DR-50 is
     /// enforced by <see cref="GameSession.HardDrop"/> itself: a request that arrives with no active
-    /// piece or outside <see cref="GameStatus.Playing"/> is simply discarded.
+    /// piece or outside <see cref="GameStatus.Playing"/> is simply discarded. Returns the resulting
+    /// board so the drop is visible immediately, without navigating the page.
     /// </summary>
     public IActionResult OnPostHardDrop()
     {
         HttpContext.Session.SetString("touched", "1");
         var session = _store.Get(SessionId);
-
-        if (session is { Status: GameStatus.Playing })
+        if (session is null)
         {
-            var now = DateTimeOffset.UtcNow;
-            if (session.LastTickAt is { } lastTick)
-            {
-                session.Tick(now - lastTick);
-            }
+            return NotFound();
+        }
 
-            session.LastTickAt = now;
+        if (session.Status == GameStatus.Playing)
+        {
+            TickToNow(session);
             session.HardDrop();
         }
 
-        return RedirectToPage();
+        Session = session;
+        return Partial("_GameBoard", this);
     }
 
     /// <summary>
     /// Spec 002 FR-002/DR-29: the handler every bound key's client-side script posts to. Ticks
     /// gravity/soft-drop up to "now" first (DR-43: gravity for elapsed time, then this input) and
     /// applies exactly one <see cref="InputCommand"/>, gated by <see cref="GameSession"/> itself
-    /// per DR-28. Returns 204 — the page's own auto-refresh (meta-refresh) re-renders the board;
-    /// this endpoint exists only to deliver the command with low latency between refreshes.
+    /// per DR-28. Returns the board as it stands after the command, so the keypress is reflected
+    /// as soon as the server has applied it rather than at the page's next poll.
     /// </summary>
     public IActionResult OnPostInput(InputCommand command)
     {
@@ -174,19 +204,11 @@ public class GameModel : PageModel
             }
 
             session.LastTickAt = DateTimeOffset.UtcNow;
-            return new NoContentResult();
+            Session = session;
+            return Partial("_GameBoard", this);
         }
 
-        if (session.Status == GameStatus.Playing)
-        {
-            var now = DateTimeOffset.UtcNow;
-            if (session.LastTickAt is { } lastTick)
-            {
-                session.Tick(now - lastTick);
-            }
-
-            session.LastTickAt = now;
-        }
+        TickToNow(session);
 
         switch (command)
         {
@@ -210,7 +232,8 @@ public class GameModel : PageModel
                 break;
         }
 
-        return new NoContentResult();
+        Session = session;
+        return Partial("_GameBoard", this);
     }
 
     /// <summary>Spec 002 DR-31/DR-32/EC-7/EC-8: a direction key was released (or focus was lost,

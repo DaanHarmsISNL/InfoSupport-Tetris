@@ -27,16 +27,40 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/Game.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcR2FtZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/Leaderboard.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTGVhZGVyYm9hcmQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/Privacy.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJpdmFjeS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/Shared/_ControlsPanel.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9Db250cm9sc1BhbmVsLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/_GameBoard.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0dhbWVCb2FyZC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/_HoldDisplay.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0hvbGREaXNwbGF5LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/_NextPiecePreview.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX05leHRQaWVjZVByZXZpZXcuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/cursist-9l9uxsp7/Desktop/ClaudeTraining/videogame/infosupport-tetris/Pages/_ViewImports.cshtml]

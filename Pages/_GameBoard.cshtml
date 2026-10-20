@@ -1,0 +1,87 @@
+@model infosupport_tetris.Pages.GameModel
+@using infosupport_tetris.Domain
+
+@*
+    The live region of the game screen: everything that changes as the game runs (readouts,
+    playfield, hold, next piece). It is rendered inline on first load *and* returned on its own
+    by GameModel.OnGetBoard / OnPostInput / OnPostHardDrop, so Razor stays the single source of
+    truth for the board markup while the client patches only these fragments in place.
+
+    US-003 (DR-14/DR-26): gravity is still driven entirely server-side -- each request recomputes
+    GameSession.Tick from real elapsed wall-clock time. What changed is only *how* the browser
+    picks the new state up: a polling fetch that swaps the fragments below, instead of a
+    <meta http-equiv="refresh"> that tore down and rebuilt the whole document four times a second
+    (which made the page flicker and dropped keystrokes along with the JS context).
+
+    Every #...-host wrapper below is a fragment the client replaces wholesale, so none of them may
+    contain a <script> or any state the player owns (focus, <details> open/closed): script content
+    assigned via innerHTML never executes, and the state would be reset on every frame. That is
+    exactly why #controls sits outside the host wrappers -- the controls panel carries its own
+    localStorage script and the player's collapse state (014 DR-273).
+*@
+
+@{
+    var session = Model.Session!;
+
+    // Built fresh on every access (it projects ActivePiece into a dictionary), so read it once
+    // here rather than inside the 20x10 cell loop below.
+    var activePieceCells = Model.ActivePieceVisibleCells;
+}
+
+@* DR-160 (Tabular Figures): these readouts change every tick, so each must carry .numeric --
+   otherwise proportional digit widths reflow the rest of the line (and everything after it)
+   every time a digit changes. *@
+<div id="game-stats" data-status="@session.Status">
+    <p>
+        Status: @session.Status &nbsp;|&nbsp;
+        Level: <span class="numeric">@session.Level</span> &nbsp;|&nbsp;
+        Score: <span class="numeric">@session.Score</span> &nbsp;|&nbsp;
+        Lines: <span class="numeric">@session.LinesCleared</span>
+    </p>
+</div>
+
+@* FR-003/FR-004/DR-01: only the 20 visible rows x 10 columns are drawn; the 20 buffer
+   rows above them are never rendered, so a piece occupying only buffer rows is invisible.
+   US-002: the active piece's cells are colour-coded by TetrominoType (DR-24) via
+   Model.ActivePieceVisibleCells, which already excludes buffer-row cells. *@
+<div class="tetris-layout">
+    <div id="game-playfield-host">
+        <div class="tetris-playfield" role="img" aria-label="Tetris playfield">
+            @for (var visibleRow = 0; visibleRow < Playfield.VisibleRowCount; visibleRow++)
+            {
+                <div class="tetris-row">
+                    @for (var column = 0; column < Playfield.ColumnCount; column++)
+                    {
+                        var cell = session.Playfield.GetVisibleCell(visibleRow, column);
+                        if (activePieceCells.TryGetValue((visibleRow, column), out var activeColour))
+                        {
+                            <div class="tetris-cell occupied active-piece" style="background-color:@activeColour;"></div>
+                        }
+                        else
+                        {
+                            var cssClass = cell.IsOccupied ? $"tetris-cell occupied type-{cell.Occupant}" : "tetris-cell";
+                            <div class="@cssClass"></div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="tetris-side-panel">
+        <div id="game-hold-host">
+            @await Html.PartialAsync("_HoldDisplay", Model.Hold)
+        </div>
+        <div id="game-preview-host">
+            @await Html.PartialAsync("_NextPiecePreview", Model.Preview)
+        </div>
+
+        @* docs/specs/014-controls-panel.md DR-266/FR-009: permanent, fully visible beside
+           the board throughout Playing; DR-268: non-focusable collapse control while
+           Playing, via IsPlaying below. Deliberately outside the live fragments (see above):
+           it is static for the whole run and owns player state the client must not reset. *@
+        <div id="controls">
+            @await Html.PartialAsync("_ControlsPanel", ControlsPanelViewModel.For(isPlaying: session.Status == GameStatus.Playing))
+        </div>
+    </div>
+</div>

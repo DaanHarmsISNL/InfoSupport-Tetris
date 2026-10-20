@@ -15,6 +15,11 @@ html {
   /* Constant Root Font Size (DR-143): 16px at every viewport width, so
      every rem-based token has exactly one pixel meaning. */
   font-size: 16px;
+
+  /* Matches body's background (not just a reset). Browsers paint <html>'s
+     background as the interim frame of a navigation, so leaving it at the
+     UA default white flashes white between pages on a dark surface. */
+  background-color: var(--surface);
 }
 
 body {
