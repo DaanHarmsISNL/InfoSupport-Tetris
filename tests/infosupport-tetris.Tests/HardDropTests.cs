@@ -306,4 +306,39 @@ public class HardDropTests
         Assert.Equal(steps, outcome!.CellsTravelled);
         Assert.Equal(gravityPiece.Position, outcome.LandingPosition);
     }
+
+    // Integration with spec 002: ComputeHardDropDistance/HardDrop must honor a piece's current
+    // Orientation (as set by ActivePiece.TryRotate), not just its spawn orientation -- otherwise
+    // a rotated piece could be hard-dropped against the wrong footprint and tunnel into/through
+    // the stack.
+    [Fact]
+    public void HardDrop_AfterRotation_UsesRotatedFootprint_NotSpawnOrientation()
+    {
+        var session = new GameSession(pieceQueueSeed: 2);
+        session.Start(DateTimeOffset.UtcNow);
+        var piece = session.ActivePiece!;
+
+        var rotated = piece.TryRotate(RotationDirection.Clockwise, session.Playfield);
+        Assert.True(rotated);
+        Assert.NotEqual(Orientation.Spawn, piece.Orientation);
+
+        var rotatedOrientation = piece.Orientation;
+
+        var outcome = session.HardDrop();
+
+        Assert.NotNull(outcome);
+        Assert.True(outcome!.CellsTravelled >= 0);
+
+        // The locked cells in the playfield must match the piece's rotated footprint translated
+        // straight down by CellsTravelled -- i.e. hard drop used the rotated orientation for every
+        // candidate row, not the spawn orientation.
+        var definition = TetrominoDefinition.For(piece.Type);
+        var offsets = definition.OffsetsFor(rotatedOrientation);
+        foreach (var offset in offsets)
+        {
+            var row = outcome.LandingPosition.Row + offset.RowOffset;
+            var column = outcome.LandingPosition.Column + offset.ColumnOffset;
+            Assert.Equal(piece.Type, session.Playfield.GetCell(row, column).Occupant);
+        }
+    }
 }
